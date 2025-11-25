@@ -14,7 +14,6 @@ export type SwapConfig = {
   askDecimals: number;
 };
 
-// Default pair for manual form; override in UI as needed.
 export const DEFAULT_SWAP_CONFIG: SwapConfig = {
   offerMinter: "EQCjDWk_lny7JRjzfD0CYR9eLj9S1bNs7oKgPIsENcYIu5cJ", // STON
   askMinter: "EQCWNM6CTi7d4zJFqeSa9u_oB0te_AKLi6dOa_8uTrX1FIJQ", // jUSDT

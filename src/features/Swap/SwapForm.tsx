@@ -98,16 +98,8 @@ const SwapForm = () => {
   return (
     <Stack gap="md">
       <Group justify="space-between">
-        <Text fw={700}>Простой swap через STON.fi Router (mainnet)</Text>
-        <Text size="sm" c="dimmed">
-          {isConnected ? `Подключен: ${walletAddress}` : "Кошелек не подключен"}
-        </Text>
+        <Text fw={700}>STON.fi Router</Text>
       </Group>
-
-      <Alert color="gray" title="Ручные настройки">
-        Укажите адреса jetton-минтеров и десятичность токенов. По умолчанию STON
-        → jUSDT.
-      </Alert>
 
       <TextInput
         label="Offer jetton minter (отдаём)"

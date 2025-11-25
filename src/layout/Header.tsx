@@ -9,9 +9,6 @@ export const Header: FC = () => (
       <Text fw={700} size="lg">
         TON DApp
       </Text>
-      <Text c="dimmed" size="sm">
-        starter template
-      </Text>
     </Group>
     <Group gap="lg" align="center">
       <Group gap="md" align="center">
