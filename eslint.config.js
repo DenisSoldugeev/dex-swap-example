@@ -1,6 +1,6 @@
-import js from '@eslint/js';
 import globals from 'globals';
 import reactPlugin from 'eslint-plugin-react';
+import pluginRouter from '@tanstack/eslint-plugin-router'
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import importPlugin from 'eslint-plugin-import';
@@ -38,15 +38,14 @@ export default [
       'jsx-a11y': jsxA11y,
     },
     rules: {
-      ...js.configs.recommended.rules,
       ...reactPlugin.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
-      ...importPlugin.configs.recommended.rules,
+      ...importPlugin.rules,
       ...tsPlugin.configs.recommended.rules,
-      ...jsxA11y.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
+    ...pluginRouter.configs['flat/recommended'],
   },
 ];

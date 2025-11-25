@@ -6,10 +6,6 @@ import { TanStackRouterVite } from "@tanstack/router-vite-plugin";
 // Vite config with React SWC for fast HMR and TS support
 export default defineConfig({
   plugins: [
-    TanStackRouterVite({
-      routesDirectory: "./src/router/routes",
-      generatedRouteTree: "./src/router/routeTree.gen.ts",
-    }),
     react(),
   ],
   resolve: {
