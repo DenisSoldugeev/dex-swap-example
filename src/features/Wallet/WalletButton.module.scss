@@ -1,0 +1,23 @@
+@use 'styles/variables';
+
+.walletGroup {
+  display: flex;
+  align-items: center;
+  gap: variables.$spacing-md;
+}
+
+.address {
+  color: variables.$color-terminal-cyan;
+  font-size: variables.$font-size-sm;
+  font-weight: 600;
+  font-family: variables.$font-mono;
+  padding: variables.$spacing-xs variables.$spacing-sm;
+  background: variables.$color-bg-light;
+  border: variables.$border-width solid variables.$color-border;
+  border-radius: variables.$border-radius;
+
+  &::before {
+    content: '◆ ';
+    color: variables.$color-terminal-green;
+  }
+}

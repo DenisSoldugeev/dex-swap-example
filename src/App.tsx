@@ -1,12 +1,11 @@
 import type { FC } from 'react';
-import { Stack, Title } from '@mantine/core';
-import SwapForm from './features/Swap/SwapForm';
+import TerminalLayout from './layout/TerminalLayout';
+import SimpleSwapForm from './features/Swap/SimpleSwapForm';
 
 const App: FC = () => (
-  <Stack gap="md">
-    <Title order={2}>Swap</Title>
-    <SwapForm />
-  </Stack>
+  <TerminalLayout>
+    <SimpleSwapForm />
+  </TerminalLayout>
 );
 
 export default App;

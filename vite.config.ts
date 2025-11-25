@@ -20,11 +20,16 @@ export default defineConfig({
   server: {
     host: true,
     port: 5190,
-    allowedHosts: ["localhost", "veritably-stellar-batfish.cloudpub.ru"], // adjust as needed
+    allowedHosts: ["localhost", ".cloudpub.ru"],
   },
   css: {
     modules: {
       localsConvention: "camelCaseOnly",
+    },
+    preprocessorOptions: {
+      scss: {
+          loadPaths: [path.resolve(__dirname, "src")],
+      },
     },
   },
 });

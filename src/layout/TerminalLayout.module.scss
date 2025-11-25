@@ -1,0 +1,118 @@
+@use 'styles/variables';
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  height: 100vh;
+  background: variables.$color-bg-dark;
+}
+
+.header {
+  grid-column: 1 / -1;
+  padding: variables.$spacing-md variables.$spacing-lg;
+  background: variables.$color-bg-darker;
+  border-bottom: 2px solid variables.$color-border-active;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: variables.$spacing-md;
+  color: variables.$color-terminal-green;
+  font-size: variables.$font-size-xl;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+
+  &::before {
+    content: '▸';
+    font-size: 1.5em;
+    animation: variables.$glow-animation;
+  }
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: variables.$spacing-md;
+  font-size: variables.$font-size-sm;
+  color: variables.$color-text-secondary;
+
+  &::before {
+    content: '●';
+    color: variables.$color-terminal-green;
+    animation: pulse 2s ease-in-out infinite;
+  }
+}
+
+.leftPanel {
+  padding: variables.$spacing-xl;
+  border-right: variables.$border-width solid variables.$color-border;
+  overflow-y: auto;
+}
+
+.rightPanel {
+  padding: variables.$spacing-xl;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.panelTitle {
+  color: variables.$color-terminal-green;
+  font-size: variables.$font-size-lg;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 variables.$spacing-lg;
+  padding-bottom: variables.$spacing-sm;
+  border-bottom: variables.$border-width solid variables.$color-border;
+  display: flex;
+  align-items: center;
+  gap: variables.$spacing-sm;
+
+  &::before {
+    content: '[';
+    color: variables.$color-terminal-green-dim;
+  }
+
+  &::after {
+    content: ']';
+    color: variables.$color-terminal-green-dim;
+  }
+}
+
+.consoleWrapper {
+  flex: 1;
+  min-height: 0;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (max-width: 1024px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr 1fr;
+  }
+
+  .leftPanel,
+  .rightPanel {
+    border-right: none;
+    border-bottom: variables.$border-width solid variables.$color-border;
+  }
+
+  .rightPanel {
+    max-height: 40vh;
+  }
+}

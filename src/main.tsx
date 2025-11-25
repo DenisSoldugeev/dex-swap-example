@@ -11,17 +11,21 @@ import TonProvider from "./ton/TonProvider";
 import { RouterProvider } from "@tanstack/react-router";
 import { queryClient, router } from "./router/config";
 import { theme } from "./styles/theme";
+import { ConsoleLoggerProvider } from "./features/Console/useConsoleLogger";
 import "./styles/global.scss";
+import "./styles/tonconnect.scss";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <TonProvider>
-        <MantineProvider theme={theme}>
-          <Notifications />
-          <RouterProvider router={router} />
-          <ReactQueryDevtools initialIsOpen={false} />
-        </MantineProvider>
+        <ConsoleLoggerProvider>
+          <MantineProvider theme={theme}>
+            <Notifications />
+            <RouterProvider router={router} />
+            <ReactQueryDevtools initialIsOpen={false} />
+          </MantineProvider>
+        </ConsoleLoggerProvider>
       </TonProvider>
     </QueryClientProvider>
   </React.StrictMode>,
