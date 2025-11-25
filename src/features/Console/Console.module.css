@@ -1,0 +1,53 @@
+.glow {
+  animation: glow 1.5s ease-in-out infinite alternate;
+}
+
+.cursor {
+  display: inline-block;
+  width: 8px;
+  height: 14px;
+  background: var(--mantine-color-terminalGreen-5);
+  margin-left: 2px;
+  animation: blink 1s step-end infinite;
+  vertical-align: middle;
+}
+
+.fadeIn {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes glow {
+  from {
+    text-shadow:
+      0 0 5px var(--mantine-color-terminalGreen-5),
+      0 0 10px var(--mantine-color-terminalGreen-5);
+  }
+  to {
+    text-shadow:
+      0 0 10px var(--mantine-color-terminalGreen-5),
+      0 0 20px var(--mantine-color-terminalGreen-5),
+      0 0 30px var(--mantine-color-terminalGreen-6);
+  }
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

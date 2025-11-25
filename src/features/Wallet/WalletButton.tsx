@@ -11,7 +11,7 @@ const WalletButton: FC = () => {
   const wallet = useTonWallet();
   const address = wallet?.account?.address;
   const { addLog } = useConsoleLogger();
-  const prevAddressRef = useRef<string | undefined>();
+  const prevAddressRef = useRef<string | undefined>(null);
 
   useEffect(() => {
     const prevAddress = prevAddressRef.current;
@@ -35,10 +35,6 @@ const WalletButton: FC = () => {
           px="sm"
           py="xs"
           bg="terminalDark.6"
-          style={{
-            border: "1px solid var(--mantine-color-terminalDark-2)",
-            borderRadius: "var(--mantine-radius-sm)",
-          }}
         >
           ◆ {formatAddress(address)}
         </Text>

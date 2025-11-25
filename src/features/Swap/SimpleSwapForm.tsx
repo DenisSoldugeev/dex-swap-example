@@ -8,8 +8,10 @@ import {
   Paper,
   Alert,
   SegmentedControl,
-  Divider,
+  ActionIcon,
+  Center,
 } from "@mantine/core";
+import { IconArrowsExchange } from "@tabler/icons-react";
 import { useMutation } from "@tanstack/react-query";
 import { useTonConnect } from "@/shared/ton/useTonConnect";
 import { useConsoleLogger } from "@/features/Console/useConsoleLogger";
@@ -157,7 +159,7 @@ const SimpleSwapForm = () => {
       {/* Amount Input */}
       <NumberInput
         label={
-          <Text size="sm" fw={600} c="terminalGreen.5" tt="uppercase">
+          <Text size="sm" fw={600}  tt="uppercase">
             &gt; Amount
           </Text>
         }
@@ -172,17 +174,22 @@ const SimpleSwapForm = () => {
         decimalScale={6}
         placeholder="0.0"
         size="md"
+        bg={'transparent'}
       />
 
       {/* Swap Direction Indicator */}
-      <Divider
-        label={
-          <Text c="cyan" size="xl" style={{ cursor: "pointer" }} onClick={handleSwapTokens}>
-            ⇅
-          </Text>
-        }
-        labelPosition="center"
-      />
+      <Center>
+        <ActionIcon
+          variant="outline"
+          color="cyan"
+          size="xl"
+          radius="xl"
+          onClick={handleSwapTokens}
+          aria-label="Swap tokens"
+        >
+          <IconArrowsExchange size={24} stroke={2} />
+        </ActionIcon>
+      </Center>
 
       {/* To Token Display */}
       <Stack gap="xs">

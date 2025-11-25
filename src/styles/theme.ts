@@ -30,13 +30,12 @@ export const theme = createTheme({
   primaryColor: "terminalGreen",
   fontFamily:
     "'Fira Code', 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace",
-  defaultRadius: "sm",
+  defaultRadius: "lg",
   colors: {
     terminalGreen,
     terminalDark,
   },
   black: "#0a0e0f",
-  white: "#00ff41",
 
   // Global component defaults
   components: {
