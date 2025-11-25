@@ -1,8 +1,8 @@
 import type { FC } from "react";
 import { useEffect, useRef } from "react";
+import { Group, Text } from "@mantine/core";
 import { TonConnectButton, useTonWallet } from "@tonconnect/ui-react";
 import { useConsoleLogger } from "@/features/Console/useConsoleLogger";
-import styles from "./WalletButton.module.scss";
 
 const formatAddress = (address: string) =>
   `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -26,10 +26,25 @@ const WalletButton: FC = () => {
   }, [address, addLog]);
 
   return (
-    <div className={styles.walletGroup}>
-      {address && <div className={styles.address}>{formatAddress(address)}</div>}
+    <Group gap="md" align="center">
+      {address && (
+        <Text
+          c="cyan"
+          size="sm"
+          fw={600}
+          px="sm"
+          py="xs"
+          bg="terminalDark.6"
+          style={{
+            border: "1px solid var(--mantine-color-terminalDark-2)",
+            borderRadius: "var(--mantine-radius-sm)",
+          }}
+        >
+          ◆ {formatAddress(address)}
+        </Text>
+      )}
       <TonConnectButton />
-    </div>
+    </Group>
   );
 };
 

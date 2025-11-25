@@ -1,6 +1,7 @@
 import type { FC } from "react";
 import { useEffect, useRef } from "react";
-import styles from "./Console.module.scss";
+import { Paper, Stack, Text, Group, ScrollArea, Box } from "@mantine/core";
+import classes from "./Console.module.css";
 
 export type LogType = "info" | "success" | "error" | "warning";
 
@@ -23,39 +24,78 @@ const formatTime = (date: Date): string => {
   return `${hours}:${minutes}:${seconds}`;
 };
 
+const LOG_TYPE_COLORS: Record<LogType, string> = {
+  info: "cyan",
+  success: "terminalGreen.5",
+  error: "red",
+  warning: "yellow",
+};
+
 export const Console: FC<ConsoleProps> = ({ logs, title = "SYSTEM LOGS" }) => {
-  const outputRef = useRef<HTMLDivElement>(null);
+  const viewport = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (outputRef.current) {
-      outputRef.current.scrollTop = outputRef.current.scrollHeight;
+    if (viewport.current) {
+      viewport.current.scrollTo({
+        top: viewport.current.scrollHeight,
+        behavior: "smooth",
+      });
     }
   }, [logs]);
 
   return (
-    <div className={styles.console}>
-      <div className={styles.header}>
-        <h2 className={styles.title}>{title}</h2>
-      </div>
-      <div className={styles.output} ref={outputRef}>
-        {logs.length === 0 ? (
-          <div className={styles.empty}>Waiting for system events...</div>
-        ) : (
-          logs.map((log) => (
-            <div key={log.id} className={styles.logEntry}>
-              <span className={styles.timestamp}>{formatTime(log.timestamp)}</span>
-              <span className={`${styles.type} ${styles[log.type]}`}>
-                [{log.type}]
-              </span>
-              <span className={styles.message}>
-                {log.message}
-                <span className={styles.cursor} />
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
+    <Paper
+      h="100%"
+      bg="terminalDark.5"
+      withBorder
+      radius="sm"
+      style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}
+    >
+      <Group
+        gap="xs"
+        p="md"
+        bg="terminalDark.6"
+        style={{ borderBottom: "1px solid var(--mantine-color-terminalGreen-5)" }}
+      >
+        <Text c="terminalGreen.5" size="sm" fw={700} tt="uppercase" className={classes.glow}>
+          &gt;
+        </Text>
+        <Text c="terminalGreen.5" size="sm" fw={700} tt="uppercase" style={{ letterSpacing: "0.1em" }}>
+          {title}
+        </Text>
+      </Group>
+
+      <ScrollArea viewportRef={viewport} h="100%" p="md">
+        <Stack gap="xs">
+          {logs.length === 0 ? (
+            <Text c="dimmed" ta="center" fs="italic" py="xl">
+              ~ Waiting for system events... ~
+            </Text>
+          ) : (
+            logs.map((log, index) => (
+              <Group key={log.id} gap="md" wrap="nowrap" align="flex-start" className={classes.fadeIn}>
+                <Text c="dimmed" size="xs" style={{ flexShrink: 0, userSelect: "none" }}>
+                  {formatTime(log.timestamp)}
+                </Text>
+                <Text
+                  c={LOG_TYPE_COLORS[log.type]}
+                  size="xs"
+                  fw={700}
+                  tt="uppercase"
+                  style={{ flexShrink: 0, userSelect: "none", minWidth: "60px" }}
+                >
+                  [{log.type}]
+                </Text>
+                <Text c="terminalGreen.5" size="xs" style={{ wordBreak: "break-word", flex: 1 }}>
+                  {log.message}
+                  {index === logs.length - 1 && <Box component="span" className={classes.cursor} />}
+                </Text>
+              </Group>
+            ))
+          )}
+        </Stack>
+      </ScrollArea>
+    </Paper>
   );
 };
 

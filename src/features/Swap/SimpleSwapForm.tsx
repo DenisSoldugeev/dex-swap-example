@@ -1,4 +1,15 @@
 import { useState, useMemo } from "react";
+import {
+  Stack,
+  Button,
+  Group,
+  NumberInput,
+  Text,
+  Paper,
+  Alert,
+  SegmentedControl,
+  Divider,
+} from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
 import { useTonConnect } from "@/shared/ton/useTonConnect";
 import { useConsoleLogger } from "@/features/Console/useConsoleLogger";
@@ -8,10 +19,9 @@ import {
   type SwapConfig,
   type SwapQuote,
 } from "@/shared/api/stonfiSwap";
-import styles from "./SwapForm.module.scss";
 
 const TON_ADDRESS = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c";
-const USDT_ADDRESS = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs"; // jUSDT on mainnet
+const USDT_ADDRESS = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs";
 
 type TokenType = "TON" | "USDT";
 
@@ -29,7 +39,7 @@ const formatUnits = (value: bigint, decimals: number) => {
 const SimpleSwapForm = () => {
   const [fromToken, setFromToken] = useState<TokenType>("TON");
   const [toToken, setToToken] = useState<TokenType>("USDT");
-  const [amountIn, setAmountIn] = useState<string>("1");
+  const [amountIn, setAmountIn] = useState<string | number>(1);
   const [quote, setQuote] = useState<SwapQuote | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,7 +63,7 @@ const SimpleSwapForm = () => {
     setFromToken(toToken);
     setToToken(fromToken);
     setQuote(null);
-    addLog("info", `Swapped token direction: ${toToken} → ${fromToken}`);
+    addLog("info", `Swapped direction: ${toToken} → ${fromToken}`);
   };
 
   const quoteMutation = useMutation({
@@ -65,7 +75,7 @@ const SimpleSwapForm = () => {
       const expectedOut = formatUnits(q.expectedOut, config.askDecimals);
       addLog(
         "success",
-        `Quote received: ${numericAmount} ${fromToken} ≈ ${expectedOut} ${toToken}`,
+        `Quote: ${numericAmount} ${fromToken} ≈ ${expectedOut} ${toToken}`,
       );
       return q;
     },
@@ -81,10 +91,7 @@ const SimpleSwapForm = () => {
       if (!walletAddress) throw new Error("Connect wallet first");
       if (!isAmountValid) throw new Error("Enter amount > 0");
 
-      addLog(
-        "info",
-        `Initiating swap: ${numericAmount} ${fromToken} → ${toToken}`,
-      );
+      addLog("info", `Initiating swap: ${numericAmount} ${fromToken} → ${toToken}`);
 
       const currentQuote: SwapQuote =
         quote ?? (await getSwapQuote(config, numericAmount));
@@ -100,7 +107,7 @@ const SimpleSwapForm = () => {
         config,
       );
 
-      addLog("info", "Transaction prepared. Waiting for user confirmation...");
+      addLog("info", "Transaction prepared. Awaiting confirmation...");
 
       await sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + FIVE_MINUTES,
@@ -115,7 +122,7 @@ const SimpleSwapForm = () => {
 
       addLog("success", "Transaction sent successfully!");
       setQuote(null);
-      setAmountIn("1");
+      setAmountIn(1);
     },
     onError: (e) => {
       const message = e instanceof Error ? e.message : "Swap failed";
@@ -125,113 +132,131 @@ const SimpleSwapForm = () => {
   });
 
   return (
-    <div className={styles.form}>
-      <div className={styles.inputGroup}>
-        <div className={styles.label}>From</div>
-        <div className={styles.tokenSelector}>
-          <button
-            type="button"
-            className={`${styles.tokenButton} ${fromToken === "TON" ? styles.active : ""}`}
-            onClick={() => {
-              setFromToken("TON");
-              setToToken("USDT");
-              setQuote(null);
-            }}
-          >
-            TON
-          </button>
-          <button
-            type="button"
-            className={`${styles.tokenButton} ${fromToken === "USDT" ? styles.active : ""}`}
-            onClick={() => {
-              setFromToken("USDT");
-              setToToken("TON");
-              setQuote(null);
-            }}
-          >
-            USDT
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.inputGroup}>
-        <div className={styles.label}>Amount</div>
-        <input
-          type="number"
-          className={styles.input}
-          value={amountIn}
-          onChange={(e) => {
-            setAmountIn(e.target.value);
+    <Stack gap="lg">
+      {/* From Token Selector */}
+      <Stack gap="xs">
+        <Text size="sm" fw={600} c="terminalGreen.5" tt="uppercase">
+          &gt; From
+        </Text>
+        <SegmentedControl
+          value={fromToken}
+          onChange={(value) => {
+            setFromToken(value as TokenType);
+            setToToken(value === "TON" ? "USDT" : "TON");
             setQuote(null);
-            setError(null);
           }}
-          placeholder="0.0"
-          min="0"
-          step="0.1"
+          data={[
+            { label: "TON", value: "TON" },
+            { label: "USDT", value: "USDT" },
+          ]}
+          color="terminalGreen"
+          fullWidth
         />
-      </div>
+      </Stack>
 
-      <div className={styles.swapIcon}>⇅</div>
+      {/* Amount Input */}
+      <NumberInput
+        label={
+          <Text size="sm" fw={600} c="terminalGreen.5" tt="uppercase">
+            &gt; Amount
+          </Text>
+        }
+        value={amountIn}
+        onChange={(val) => {
+          setAmountIn(val);
+          setQuote(null);
+          setError(null);
+        }}
+        min={0}
+        step={0.1}
+        decimalScale={6}
+        placeholder="0.0"
+        size="md"
+      />
 
-      <div className={styles.inputGroup}>
-        <div className={styles.label}>To</div>
-        <div className={styles.tokenSelector}>
-          <button
-            type="button"
-            className={`${styles.tokenButton} ${toToken === "TON" ? styles.active : ""}`}
-            disabled
-          >
-            TON
-          </button>
-          <button
-            type="button"
-            className={`${styles.tokenButton} ${toToken === "USDT" ? styles.active : ""}`}
-            disabled
-          >
-            USDT
-          </button>
-        </div>
-      </div>
+      {/* Swap Direction Indicator */}
+      <Divider
+        label={
+          <Text c="cyan" size="xl" style={{ cursor: "pointer" }} onClick={handleSwapTokens}>
+            ⇅
+          </Text>
+        }
+        labelPosition="center"
+      />
 
+      {/* To Token Display */}
+      <Stack gap="xs">
+        <Text size="sm" fw={600} c="terminalGreen.5" tt="uppercase">
+          &gt; To
+        </Text>
+        <SegmentedControl
+          value={toToken}
+          data={[
+            { label: "TON", value: "TON" },
+            { label: "USDT", value: "USDT" },
+          ]}
+          color="terminalGreen"
+          fullWidth
+          disabled
+        />
+      </Stack>
+
+      {/* Quote Display */}
       {quote && (
-        <div className={styles.quoteBox}>
-          <div className={styles.quoteTitle}>Quote</div>
-          <div className={styles.quoteRow}>
-            <span className={styles.quoteLabel}>Expected out:</span>
-            <span className={styles.quoteValue}>
-              {formatUnits(quote.expectedOut, config.askDecimals)} {toToken}
-            </span>
-          </div>
-          <div className={styles.quoteRow}>
-            <span className={styles.quoteLabel}>Min out (0.5%):</span>
-            <span className={styles.quoteValue}>
-              {formatUnits(quote.minOut, config.askDecimals)} {toToken}
-            </span>
-          </div>
-        </div>
+        <Paper bg="terminalDark.5" withBorder>
+          <Stack gap="xs">
+            <Text size="sm" c="cyan" fw={700} tt="uppercase">
+              [ Quote ]
+            </Text>
+            <Group justify="space-between">
+              <Text size="sm" c="dimmed">
+                Expected out:
+              </Text>
+              <Text size="sm" c="terminalGreen.5" fw={600}>
+                {formatUnits(quote.expectedOut, config.askDecimals)} {toToken}
+              </Text>
+            </Group>
+            <Group justify="space-between">
+              <Text size="sm" c="dimmed">
+                Min out (0.5%):
+              </Text>
+              <Text size="sm" c="terminalGreen.5" fw={600}>
+                {formatUnits(quote.minOut, config.askDecimals)} {toToken}
+              </Text>
+            </Group>
+          </Stack>
+        </Paper>
       )}
 
-      {error && <div className={styles.error}>{error}</div>}
+      {/* Error Display */}
+      {error && (
+        <Alert color="red" title="⚠ ERROR" onClose={() => setError(null)} withCloseButton>
+          {error}
+        </Alert>
+      )}
 
-      <div className={styles.actions}>
-        <button
-          type="button"
-          className={styles.button}
+      {/* Action Buttons */}
+      <Group grow>
+        <Button
+          variant="outline"
+          color="terminalGreen"
           onClick={() => quoteMutation.mutate()}
-          disabled={quoteMutation.isPending || !isAmountValid}
+          loading={quoteMutation.isPending}
+          disabled={!isAmountValid}
         >
-          {quoteMutation.isPending ? "Loading..." : "Get Quote"}
-        </button>
-        <button
-          type="button"
-          className={`${styles.button} ${styles.primary}`}
+          Get Quote
+        </Button>
+        <Button
+          variant="filled"
+          color="terminalGreen"
           onClick={() => swapMutation.mutate()}
-          disabled={!isConnected || !isAmountValid || swapMutation.isPending}
+          loading={swapMutation.isPending}
+          disabled={!isConnected || !isAmountValid}
         >
-          {swapMutation.isPending ? "Processing..." : "Swap"}
-        </button>
-      </div>
-    </div>
+          Swap
+        </Button>
+      </Group>
+    </Stack>
   );
 };
 
