@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { StonApiClient, AssetTag } from "@ston-fi/api";
 import { Client } from "@ston-fi/sdk";
 import { dexFactory } from "@ston-fi/sdk";
+import { Cell } from "@ton/core";
 import { useTonConnectUI, useTonAddress } from "@tonconnect/ui-react";
 import { useConsoleLogger } from "@/features/Console/useConsoleLogger";
 import SwapSimulationDetails from "./SwapSimulationDetails";
@@ -215,7 +216,7 @@ const SimpleSwapForm = () => {
       addLog("info", "Sending transaction...");
 
       // 6. Send transaction via TonConnect
-      await tonConnectUI.sendTransaction({
+      const txResult = await tonConnectUI.sendTransaction({
         validUntil: Date.now() + 5 * 60 * 1000,
         messages: [
           {
@@ -226,7 +227,46 @@ const SimpleSwapForm = () => {
         ]
       });
 
-      addLog("success", "Transaction sent successfully!");
+      // Calculate transaction hash from BOC
+      let txHash: string | undefined;
+      try {
+        if (txResult.boc) {
+          const cell = Cell.fromBase64(txResult.boc);
+          txHash = cell.hash().toString('hex');
+        }
+      } catch (e) {
+        console.error('Failed to calculate tx hash:', e);
+      }
+
+      // Log transaction details
+      addLog("success", "✅ Transaction sent successfully!");
+      addLog("info", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      addLog("info", "📊 Transaction Details:");
+      addLog("info", `   From: ${numericAmount} ${getAssetLabel(fromAsset)}`);
+      addLog("info", `   To: ~${expectedOut} ${getAssetLabel(toAsset)}`);
+      addLog("info", `   Min: ${(Number(result.minAskUnits) / toDecimals).toFixed(4)} ${getAssetLabel(toAsset)}`);
+      addLog("info", `   Slippage: ${(parseFloat(result.slippageTolerance || "0.01") * 100).toFixed(2)}%`);
+
+      if (result.priceImpact) {
+        const priceImpact = parseFloat(result.priceImpact);
+        const impactPercent = (priceImpact * 100).toFixed(2);
+        addLog("info", `   Price Impact: ${impactPercent}%`);
+      }
+
+      const rate = (Number(result.askUnits) / Number(result.offerUnits)).toFixed(6);
+      addLog("info", `   Rate: 1 ${getAssetLabel(fromAsset)} = ${rate} ${getAssetLabel(toAsset)}`);
+
+      // Add blockchain explorer links
+      addLog("info", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      addLog("success", `🔍 View transaction:`);
+      if (txHash) {
+        addLog("info", `   TONViewer: https://tonviewer.com/transaction/${txHash}`);
+        addLog("info", `   TONScan: https://tonscan.org/tx/${txHash}`);
+      } else {
+        addLog("info", `   Your wallet: https://tonviewer.com/${userAddress}`);
+      }
+      addLog("info", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
       setAmountIn(1);
       setSimulationResult(null);
 

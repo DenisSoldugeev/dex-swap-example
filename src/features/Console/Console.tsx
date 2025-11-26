@@ -87,7 +87,25 @@ export const Console: FC<ConsoleProps> = ({ logs, title = "SYSTEM LOGS" }) => {
                   [{log.type}]
                 </Text>
                 <Text c="terminalGreen.5" size="xs" style={{ wordBreak: "break-word", flex: 1 }}>
-                  {log.message}
+                  {log.message.split(' ').map((word, i) => {
+                    if (word.startsWith('http://') || word.startsWith('https://')) {
+                      return (
+                        <Text
+                          key={i}
+                          component="a"
+                          href={word}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          c="cyan"
+                          td="underline"
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {word}{' '}
+                        </Text>
+                      );
+                    }
+                    return word + ' ';
+                  })}
                   {index === logs.length - 1 && <Box component="span" className={classes.cursor} />}
                 </Text>
               </Group>
