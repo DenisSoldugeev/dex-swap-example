@@ -11,6 +11,7 @@ import {
   ActionIcon,
   Center,
   Loader,
+  Avatar,
 } from "@mantine/core";
 import { IconArrowsExchange } from "@tabler/icons-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -254,6 +255,22 @@ const SimpleSwapForm = () => {
         }))}
         searchable
         size="md"
+        leftSection={
+          fromAsset?.meta?.imageUrl && (
+            <Avatar src={fromAsset.meta.imageUrl} size={24} radius="xl" />
+          )
+        }
+        renderOption={({ option }) => {
+          const asset = assets.find((a) => a.contractAddress === option.value);
+          return (
+            <Group gap="sm" wrap="nowrap">
+              {asset?.meta?.imageUrl && (
+                <Avatar src={asset.meta.imageUrl} size={28} radius="xl" />
+              )}
+              <Text>{option.label}</Text>
+            </Group>
+          );
+        }}
       />
 
       {/* Amount Input */}
@@ -318,6 +335,22 @@ const SimpleSwapForm = () => {
         }))}
         searchable
         size="md"
+        leftSection={
+          toAsset?.meta?.imageUrl && (
+            <Avatar src={toAsset.meta.imageUrl} size={24} radius="xl" />
+          )
+        }
+        renderOption={({ option }) => {
+          const asset = assets.find((a) => a.contractAddress === option.value);
+          return (
+            <Group gap="sm" wrap="nowrap">
+              {asset?.meta?.imageUrl && (
+                <Avatar src={asset.meta.imageUrl} size={28} radius="xl" />
+              )}
+              <Text>{option.label}</Text>
+            </Group>
+          );
+        }}
       />
 
       {/* Simulation Result */}

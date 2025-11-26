@@ -14,16 +14,16 @@ const terminalGreen: MantineColorsTuple = [
 ];
 
 const terminalDark: MantineColorsTuple = [
-  "#3d4f5c",
-  "#2d3f4c",
-  "#1d2f3c",
-  "#141819",
-  "#0a0e0f", // primary dark
-  "#060809",
-  "#040607",
-  "#020405",
-  "#010203",
-  "#000000",
+  "#4a5568",
+  "#3a4556",
+  "#2d3748",
+  "#252d3a",
+  "#1a202c", // primary dark - темно-серый, не черный
+  "#171d28",
+  "#141924",
+  "#111520",
+  "#0e111c",
+  "#0a0d18",
 ];
 
 export const theme = createTheme({
@@ -35,7 +35,7 @@ export const theme = createTheme({
     terminalGreen,
     terminalDark,
   },
-  black: "#0a0e0f",
+  black: "#1a202c",
 
   // Global component defaults
   components: {
@@ -48,6 +48,12 @@ export const theme = createTheme({
           fontWeight: 700,
           textTransform: "uppercase",
           letterSpacing: "0.05em",
+          border: "2px solid",
+          transition: "all 0.2s ease",
+          "&:hover": {
+            transform: "translateY(-2px)",
+            boxShadow: "0 4px 12px rgba(0, 255, 65, 0.3)",
+          },
         },
       },
     },
@@ -55,6 +61,20 @@ export const theme = createTheme({
       styles: {
         input: {
           fontFamily: "'Fira Code', 'JetBrains Mono', monospace",
+          backgroundColor: "#252d3a",
+          border: "1px solid #3a4556",
+          color: "#00ff41",
+          transition: "all 0.2s ease",
+          "&:focus": {
+            borderColor: "#00ff41",
+            boxShadow: "0 0 0 1px #00ff41",
+          },
+          "&::placeholder": {
+            color: "#4a5568",
+          },
+        },
+        label: {
+          color: "#00ff41",
         },
       },
     },
@@ -62,6 +82,54 @@ export const theme = createTheme({
       styles: {
         input: {
           fontFamily: "'Fira Code', 'JetBrains Mono', monospace",
+          backgroundColor: "#252d3a",
+          border: "1px solid #3a4556",
+          color: "#00ff41",
+          transition: "all 0.2s ease",
+          "&:focus": {
+            borderColor: "#00ff41",
+            boxShadow: "0 0 0 1px #00ff41",
+          },
+          "&::placeholder": {
+            color: "#4a5568",
+          },
+        },
+        label: {
+          color: "#00ff41",
+        },
+      },
+    },
+    Select: {
+      styles: {
+        input: {
+          fontFamily: "'Fira Code', 'JetBrains Mono', monospace",
+          backgroundColor: "#252d3a",
+          border: "1px solid #3a4556",
+          color: "#00ff41",
+          transition: "all 0.2s ease",
+          "&:focus": {
+            borderColor: "#00ff41",
+            boxShadow: "0 0 0 1px #00ff41",
+          },
+          "&::placeholder": {
+            color: "#4a5568",
+          },
+        },
+        label: {
+          color: "#00ff41",
+        },
+        dropdown: {
+          backgroundColor: "#252d3a",
+          border: "1px solid #3a4556",
+        },
+        option: {
+          color: "#00ff41",
+          "&[data-combobox-selected]": {
+            backgroundColor: "#2d3748",
+          },
+          "&:hover": {
+            backgroundColor: "#2d3748",
+          },
         },
       },
     },
@@ -69,6 +137,12 @@ export const theme = createTheme({
       defaultProps: {
         p: "md",
         withBorder: true,
+      },
+      styles: {
+        root: {
+          backgroundColor: "#252d3a",
+          borderColor: "#3a4556",
+        },
       },
     },
   },
