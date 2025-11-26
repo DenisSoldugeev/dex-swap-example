@@ -7,7 +7,7 @@ export const Header: FC = () => (
   <Group h="100%" px="md" justify="space-between" align="center">
     <Group gap="xs">
       <Text fw={700} size="lg">
-        TON DApp
+        POOL SCANNER
       </Text>
     </Group>
     <Group gap="lg" align="center">

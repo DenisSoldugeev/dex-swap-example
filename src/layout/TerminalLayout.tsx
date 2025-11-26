@@ -30,7 +30,7 @@ export const TerminalLayout: FC<TerminalLayoutProps> = ({children}) => {
                 </Group>
             </Group>
 
-            <Grid gutter={0}>
+            <Grid gutter={'lg'}>
                 <Grid.Col span={{base: 12, md: 4}}>
                     <Box>
                         <Text
@@ -59,7 +59,7 @@ export const TerminalLayout: FC<TerminalLayoutProps> = ({children}) => {
                         maxHeight: "100%",
                     }}
                 >
-                    <Box p="xl" style={{flex: 1, display: "flex", flexDirection: "column", minHeight: 0}}>
+                    <Box style={{flex: 1, display: "flex", flexDirection: "column", minHeight: 0}}>
                         <Console logs={logs}/>
                     </Box>
                 </Grid.Col>
