@@ -1,5 +1,5 @@
 import type {FC, ReactNode} from "react";
-import {Box, Grid, Group, Text, SimpleGrid} from "@mantine/core";
+import {Box, Grid, Group, Text, SimpleGrid, Flex} from "@mantine/core";
 import {useTonConnect} from "@/shared/ton/useTonConnect";
 import WalletButton from "@/features/Wallet/WalletButton";
 import Console from "@/features/Console/Console";
@@ -15,12 +15,11 @@ export const TerminalLayout: FC<TerminalLayoutProps> = ({children}) => {
     const {logs} = useConsoleLogger();
 
     return (
-        <SimpleGrid bg="terminalDark.4" cols={1} spacing={'md'}>
+        <Flex direction={'column'} gap={32} bg="terminalDark.4">
             <Group justify="space-between" align="center">
                 <Text size="lg" fw={600} tt="uppercase">
                     ▸ DEX SWAP
                 </Text>
-
                 <Group gap="lg">
                     <Group gap="xs" className={classes.status}>
                         <Text c="terminalGreen.6" size="sm" tt="uppercase">
@@ -31,13 +30,9 @@ export const TerminalLayout: FC<TerminalLayoutProps> = ({children}) => {
                 </Group>
             </Group>
 
-            {/* Main Content Grid */}
             <Grid gutter={0}>
-                {/* Left Panel - Swap Interface */}
-                <Grid.Col
-                    span={{base: 12, md: 6}}
-                >
-                    <Box p="xl">
+                <Grid.Col span={{base: 12, md: 4}}>
+                    <Box>
                         <Text
                             c="terminalGreen.5"
                             size="lg"
@@ -46,7 +41,6 @@ export const TerminalLayout: FC<TerminalLayoutProps> = ({children}) => {
                             mb="lg"
                             pb="sm"
                             style={{
-                                letterSpacing: "0.1em",
                                 borderBottom: "1px solid var(--mantine-color-terminalDark-2)",
                             }}
                         >
@@ -58,7 +52,7 @@ export const TerminalLayout: FC<TerminalLayoutProps> = ({children}) => {
 
                 {/* Right Panel - Console */}
                 <Grid.Col
-                    span={{base: 12, md: 6}}
+                    span={{base: 12, md: 8}}
                     style={{
                         display: "flex",
                         flexDirection: "column",
@@ -70,7 +64,7 @@ export const TerminalLayout: FC<TerminalLayoutProps> = ({children}) => {
                     </Box>
                 </Grid.Col>
             </Grid>
-        </SimpleGrid>
+        </Flex>
     );
 };
 

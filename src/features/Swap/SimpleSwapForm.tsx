@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Stack,
   Button,
@@ -7,27 +7,34 @@ import {
   Text,
   Paper,
   Alert,
-  SegmentedControl,
+  Select,
   ActionIcon,
   Center,
+  Loader,
 } from "@mantine/core";
 import { IconArrowsExchange } from "@tabler/icons-react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { StonApiClient, AssetTag } from "@ston-fi/api";
 import { useTonConnect } from "@/shared/ton/useTonConnect";
 import { useConsoleLogger } from "@/features/Console/useConsoleLogger";
 import {
   buildSwapTransaction,
   getSwapQuote,
   type SwapConfig,
-  type SwapQuote,
 } from "@/shared/api/stonfiSwap";
 
-const TON_ADDRESS = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c";
-const USDT_ADDRESS = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs";
-
-type TokenType = "TON" | "USDT";
-
 const FIVE_MINUTES = 5 * 60;
+
+// Fetch assets with high/medium liquidity
+const fetchAssets = async () => {
+  const client = new StonApiClient();
+  const condition = [
+    AssetTag.LiquidityVeryHigh,
+    AssetTag.LiquidityHigh,
+    AssetTag.LiquidityMedium,
+  ].join(" | ");
+  return client.queryAssets({ condition });
+};
 
 const formatUnits = (value: bigint, decimals: number) => {
   const raw = value.toString();
@@ -39,78 +46,152 @@ const formatUnits = (value: bigint, decimals: number) => {
 };
 
 const SimpleSwapForm = () => {
-  const [fromToken, setFromToken] = useState<TokenType>("TON");
-  const [toToken, setToToken] = useState<TokenType>("USDT");
+  const [fromAssetAddress, setFromAssetAddress] = useState<string>("");
+  const [toAssetAddress, setToAssetAddress] = useState<string>("");
   const [amountIn, setAmountIn] = useState<string | number>(1);
-  const [quote, setQuote] = useState<SwapQuote | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [simulationResult, setSimulationResult] = useState<any>(null);
 
   const { walletAddress, isConnected, sendTransaction } = useTonConnect();
   const { addLog } = useConsoleLogger();
 
-  const config: SwapConfig = useMemo(
-    () => ({
-      offerMinter: fromToken === "TON" ? TON_ADDRESS : USDT_ADDRESS,
-      askMinter: toToken === "TON" ? TON_ADDRESS : USDT_ADDRESS,
-      offerDecimals: fromToken === "TON" ? 9 : 6,
-      askDecimals: toToken === "TON" ? 9 : 6,
-    }),
-    [fromToken, toToken],
+  // Fetch assets query
+  const {
+    data: assets = [],
+    isLoading: assetsLoading,
+    error: assetsError,
+  } = useQuery({
+    queryKey: ["assets"],
+    queryFn: fetchAssets,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Set default assets when loaded
+  useEffect(() => {
+    if (assets.length > 0 && !fromAssetAddress && !toAssetAddress) {
+      setFromAssetAddress(assets[0].contractAddress);
+      if (assets[1]) {
+        setToAssetAddress(assets[1].contractAddress);
+      }
+      addLog("info", `Loaded ${assets.length} assets from STON.fi`);
+    }
+  }, [assets, fromAssetAddress, toAssetAddress, addLog]);
+
+  // Find selected assets
+  const fromAsset = useMemo(
+    () => assets.find((a) => a.contractAddress === fromAssetAddress),
+    [assets, fromAssetAddress],
   );
+
+  const toAsset = useMemo(
+    () => assets.find((a) => a.contractAddress === toAssetAddress),
+    [assets, toAssetAddress],
+  );
+
+  // Build swap config
+  const config: SwapConfig = useMemo(() => {
+    if (!fromAsset || !toAsset) {
+      return {
+        offerMinter: "",
+        askMinter: "",
+        offerDecimals: 9,
+        askDecimals: 9,
+      };
+    }
+
+    return {
+      offerMinter: fromAsset.contractAddress,
+      askMinter: toAsset.contractAddress,
+      offerDecimals: fromAsset.meta?.decimals ?? 9,
+      askDecimals: toAsset.meta?.decimals ?? 9,
+    };
+  }, [fromAsset, toAsset]);
 
   const numericAmount = useMemo(() => Number(amountIn), [amountIn]);
   const isAmountValid = Number.isFinite(numericAmount) && numericAmount > 0;
 
-  const handleSwapTokens = () => {
-    setFromToken(toToken);
-    setToToken(fromToken);
-    setQuote(null);
-    addLog("info", `Swapped direction: ${toToken} → ${fromToken}`);
+  // Get asset display name
+  const getAssetLabel = (asset: typeof assets[0]) => {
+    return asset.meta?.symbol || asset.meta?.displayName || "Token";
   };
 
-  const quoteMutation = useMutation({
-    mutationFn: async () => {
-      if (!isAmountValid) throw new Error("Enter amount > 0");
-      addLog("info", `Requesting quote for ${numericAmount} ${fromToken}...`);
-      const q = await getSwapQuote(config, numericAmount);
-      setQuote(q);
-      const expectedOut = formatUnits(q.expectedOut, config.askDecimals);
-      addLog(
-        "success",
-        `Quote: ${numericAmount} ${fromToken} ≈ ${expectedOut} ${toToken}`,
-      );
-      return q;
-    },
-    onError: (e) => {
-      const message = e instanceof Error ? e.message : "Failed to get quote";
-      setError(message);
-      addLog("error", `Quote failed: ${message}`);
-    },
-  });
+  const handleSwapTokens = () => {
+    const temp = fromAssetAddress;
+    setFromAssetAddress(toAssetAddress);
+    setToAssetAddress(temp);
+    setSimulationResult(null);
+    addLog("info", "Swapped token direction");
+  };
 
+  // Simulate swap
+  const handleSimulate = async () => {
+    if (!fromAsset || !toAsset || !isAmountValid) {
+      setError("Please select tokens and enter valid amount");
+      return;
+    }
+
+    try {
+      setError(null);
+      addLog("info", `Simulating swap: ${numericAmount} ${getAssetLabel(fromAsset)} → ${getAssetLabel(toAsset)}`);
+
+      const client = new StonApiClient();
+      const fromDecimals = 10 ** (fromAsset.meta?.decimals ?? 9);
+
+      // Convert amount to blockchain units
+      const offerUnits = (numericAmount * fromDecimals).toString();
+
+      const result = await client.simulateSwap({
+        offerAddress: fromAsset.contractAddress,
+        askAddress: toAsset.contractAddress,
+        slippageTolerance: "0.01", // 1% slippage
+        offerUnits,
+      });
+
+      setSimulationResult(result);
+
+      const toDecimals = 10 ** (toAsset.meta?.decimals ?? 9);
+      const expectedOut = (Number(result.askUnits) / toDecimals).toFixed(4);
+
+      addLog("success", `Simulation: ${numericAmount} ${getAssetLabel(fromAsset)} → ${expectedOut} ${getAssetLabel(toAsset)}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Simulation failed";
+      setError(message);
+      setSimulationResult(null);
+      addLog("error", `Simulation failed: ${message}`);
+    }
+  };
+
+  // Swap mutation
   const swapMutation = useMutation({
     mutationFn: async () => {
       if (!walletAddress) throw new Error("Connect wallet first");
       if (!isAmountValid) throw new Error("Enter amount > 0");
+      if (!fromAsset || !toAsset) throw new Error("Select tokens");
 
-      addLog("info", `Initiating swap: ${numericAmount} ${fromToken} → ${toToken}`);
+      addLog(
+        "info",
+        `Initiating swap: ${numericAmount} ${getAssetLabel(fromAsset)} → ${getAssetLabel(toAsset)}`,
+      );
 
-      const currentQuote: SwapQuote =
-        quote ?? (await getSwapQuote(config, numericAmount));
-      if (!quote) {
-        setQuote(currentQuote);
-        addLog("info", "Quote fetched automatically");
-      }
+      // Get quote
+      const quote = await getSwapQuote(config, numericAmount);
+      const expectedOut = formatUnits(quote.expectedOut, config.askDecimals);
+      addLog(
+        "success",
+        `Quote: ${numericAmount} ${getAssetLabel(fromAsset)} ≈ ${expectedOut} ${getAssetLabel(toAsset)}`,
+      );
 
+      // Build transaction
       const tx = await buildSwapTransaction(
         walletAddress,
         numericAmount,
-        currentQuote.minOut,
+        quote.minOut,
         config,
       );
 
       addLog("info", "Transaction prepared. Awaiting confirmation...");
 
+      // Send transaction
       await sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + FIVE_MINUTES,
         messages: [
@@ -123,7 +204,6 @@ const SimpleSwapForm = () => {
       });
 
       addLog("success", "Transaction sent successfully!");
-      setQuote(null);
       setAmountIn(1);
     },
     onError: (e) => {
@@ -133,48 +213,75 @@ const SimpleSwapForm = () => {
     },
   });
 
+  if (assetsLoading) {
+    return (
+      <Stack align="center" gap="md" py="xl">
+        <Loader color="terminalGreen" size="lg" />
+        <Text c="dimmed" size="sm">
+          Loading assets...
+        </Text>
+      </Stack>
+    );
+  }
+
+  if (assetsError) {
+    return (
+      <Alert color="red" title="Error loading assets">
+        {assetsError instanceof Error ? assetsError.message : "Unknown error"}
+      </Alert>
+    );
+  }
+
   return (
     <Stack gap="lg">
-      {/* From Token Selector */}
-      <Stack gap="xs">
-        <Text size="sm" fw={600} c="terminalGreen.5" tt="uppercase">
-          &gt; From
-        </Text>
-        <SegmentedControl
-          value={fromToken}
-          onChange={(value) => {
-            setFromToken(value as TokenType);
-            setToToken(value === "TON" ? "USDT" : "TON");
-            setQuote(null);
-          }}
-          data={[
-            { label: "TON", value: "TON" },
-            { label: "USDT", value: "USDT" },
-          ]}
-          color="terminalGreen"
-          fullWidth
-        />
-      </Stack>
+      {/* From Asset Selector */}
+      <Select
+        label={
+          <Text size="sm" fw={600} c="terminalGreen.5" tt="uppercase">
+            &gt; From
+          </Text>
+        }
+        placeholder="Select token"
+        value={fromAssetAddress}
+        onChange={(value) => {
+          setFromAssetAddress(value || "");
+          setError(null);
+          setSimulationResult(null);
+        }}
+        data={assets.map((asset) => ({
+          value: asset.contractAddress,
+          label: getAssetLabel(asset),
+        }))}
+        searchable
+        size="md"
+      />
 
       {/* Amount Input */}
       <NumberInput
         label={
-          <Text size="sm" fw={600}  tt="uppercase">
+          <Text size="sm" fw={600} c="terminalGreen.5" tt="uppercase">
             &gt; Amount
           </Text>
         }
         value={amountIn}
         onChange={(val) => {
           setAmountIn(val);
-          setQuote(null);
           setError(null);
+          setSimulationResult(null);
         }}
         min={0}
         step={0.1}
         decimalScale={6}
         placeholder="0.0"
         size="md"
-        bg={'transparent'}
+        rightSection={
+          fromAsset && (
+            <Text size="sm" c="dimmed">
+              {getAssetLabel(fromAsset)}
+            </Text>
+          )
+        }
+        rightSectionWidth={80}
       />
 
       {/* Swap Direction Indicator */}
@@ -191,46 +298,48 @@ const SimpleSwapForm = () => {
         </ActionIcon>
       </Center>
 
-      {/* To Token Display */}
-      <Stack gap="xs">
-        <Text size="sm" fw={600} c="terminalGreen.5" tt="uppercase">
-          &gt; To
-        </Text>
-        <SegmentedControl
-          value={toToken}
-          data={[
-            { label: "TON", value: "TON" },
-            { label: "USDT", value: "USDT" },
-          ]}
-          color="terminalGreen"
-          fullWidth
-          disabled
-        />
-      </Stack>
+      {/* To Asset Selector */}
+      <Select
+        label={
+          <Text size="sm" fw={600} c="terminalGreen.5" tt="uppercase">
+            &gt; To
+          </Text>
+        }
+        placeholder="Select token"
+        value={toAssetAddress}
+        onChange={(value) => {
+          setToAssetAddress(value || "");
+          setError(null);
+          setSimulationResult(null);
+        }}
+        data={assets.map((asset) => ({
+          value: asset.contractAddress,
+          label: getAssetLabel(asset),
+        }))}
+        searchable
+        size="md"
+      />
 
-      {/* Quote Display */}
-      {quote && (
-        <Paper bg="terminalDark.5" withBorder>
+      {/* Simulation Result */}
+      {simulationResult && toAsset && (
+        <Paper bg="terminalDark.5" withBorder p="md">
           <Stack gap="xs">
-            <Text size="sm" c="cyan" fw={700} tt="uppercase">
-              [ Quote ]
+            <Text size="sm" c="cyan" fw={700} tt="uppercase" ta="center">
+              [ Swap Summary ]
             </Text>
-            <Group justify="space-between">
-              <Text size="sm" c="dimmed">
-                Expected out:
+            <Group justify="center" gap="sm">
+              <Text size="lg" fw={700} c="terminalGreen.5">
+                {numericAmount} {getAssetLabel(fromAsset!)}
               </Text>
-              <Text size="sm" c="terminalGreen.5" fw={600}>
-                {formatUnits(quote.expectedOut, config.askDecimals)} {toToken}
-              </Text>
-            </Group>
-            <Group justify="space-between">
-              <Text size="sm" c="dimmed">
-                Min out (0.5%):
-              </Text>
-              <Text size="sm" c="terminalGreen.5" fw={600}>
-                {formatUnits(quote.minOut, config.askDecimals)} {toToken}
+              <Text c="dimmed">→</Text>
+              <Text size="lg" fw={700} c="terminalGreen.5">
+                {(Number(simulationResult.askUnits) / 10 ** (toAsset.meta?.decimals ?? 9)).toFixed(4)}{" "}
+                {getAssetLabel(toAsset)}
               </Text>
             </Group>
+            <Text size="xs" c="dimmed" ta="center">
+              Slippage tolerance: 1%
+            </Text>
           </Stack>
         </Paper>
       )}
@@ -246,19 +355,20 @@ const SimpleSwapForm = () => {
       <Group grow>
         <Button
           variant="outline"
-          color="terminalGreen"
-          onClick={() => quoteMutation.mutate()}
-          loading={quoteMutation.isPending}
-          disabled={!isAmountValid}
+          color="cyan"
+          size="lg"
+          onClick={handleSimulate}
+          disabled={!isAmountValid || !fromAsset || !toAsset}
         >
-          Get Quote
+          Simulate
         </Button>
         <Button
           variant="filled"
           color="terminalGreen"
+          size="lg"
           onClick={() => swapMutation.mutate()}
           loading={swapMutation.isPending}
-          disabled={!isConnected || !isAmountValid}
+          disabled={!isConnected || !isAmountValid || !fromAsset || !toAsset}
         >
           Swap
         </Button>
