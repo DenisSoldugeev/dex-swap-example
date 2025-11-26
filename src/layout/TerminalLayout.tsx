@@ -15,7 +15,7 @@ export const TerminalLayout: FC<TerminalLayoutProps> = ({children}) => {
     const {logs} = useConsoleLogger();
 
     return (
-        <Flex direction={'column'} gap={32} bg="terminalDark.4">
+        <Flex direction={'column'} gap={32} bg="terminalDark.4" p={{ base: 'md', sm: 'lg', md: 'xl' }} style={{ minHeight: '100vh' }}>
             <Group justify="space-between" align="center">
                 <Text size="lg" fw={600} tt="uppercase">
                     ▸ DEX SWAP
@@ -50,16 +50,16 @@ export const TerminalLayout: FC<TerminalLayoutProps> = ({children}) => {
                     </Box>
                 </Grid.Col>
 
-                {/* Right Panel - Console */}
+                {/* Right Panel - Console (Hidden on mobile) */}
                 <Grid.Col
                     span={{base: 12, md: 8}}
+                    visibleFrom="md"
                     style={{
                         display: "flex",
                         flexDirection: "column",
-                        maxHeight: "100%",
                     }}
                 >
-                    <Box style={{flex: 1, display: "flex", flexDirection: "column", minHeight: 0}}>
+                    <Box style={{flex: 1, display: "flex", flexDirection: "column"}}>
                         <Console logs={logs}/>
                     </Box>
                 </Grid.Col>

@@ -12,9 +12,7 @@ export const AppShellLayout: FC<AppShellLayoutProps> = ({ children }) => (
       <Header />
     </AppShell.Header>
     <AppShell.Main>
-      <Container size="xl" py="xs">
         {children}
-      </Container>
     </AppShell.Main>
   </AppShell>
 );

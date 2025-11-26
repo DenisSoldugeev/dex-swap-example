@@ -16,7 +16,8 @@ body {
   min-height: 100vh;
   background: variables.$color-bg-dark;
   color: variables.$color-text-primary;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 a {
