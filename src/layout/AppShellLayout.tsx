@@ -8,7 +8,7 @@ interface AppShellLayoutProps {
 
 export const AppShellLayout: FC<AppShellLayoutProps> = ({ children }) => (
   <AppShell padding="md" header={{ height: 72 }} mah="100vh">
-    <AppShell.Header bg={'transparent'}>
+    <AppShell.Header bg="terminalDark.5" withBorder>
       <Header />
     </AppShell.Header>
     <AppShell.Main>

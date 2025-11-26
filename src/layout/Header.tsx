@@ -1,39 +1,19 @@
-import type { FC } from "react";
-import { Group, Text } from "@mantine/core";
+import type {FC} from "react";
+import {Group, Text} from "@mantine/core";
 import WalletButton from "../features/Wallet/WalletButton";
-import { Link } from "../router";
+import {Link} from "../router";
 
 export const Header: FC = () => (
-  <Group h="100%" px="md" justify="space-between" align="center">
-    <Group gap="xs">
-      <Text fw={700} size="lg">
-        POOL SCANNER
-      </Text>
+    <Group h="100%" px="md" justify="space-between" align="center">
+        <Group gap="xs">
+            <Text fw={700} size="lg">
+                POOL SCANNER
+            </Text>
+        </Group>
+        <Group gap="lg" align="center">
+            <WalletButton/>
+        </Group>
     </Group>
-    <Group gap="lg" align="center">
-      <Group gap="md" align="center">
-        <Text
-          component={Link}
-          to="/"
-          fw={600}
-          c="blue"
-          style={{ textDecoration: "underline" }}
-        >
-          Swap
-        </Text>
-        <Text
-          component={Link}
-          to="/assets"
-          fw={600}
-          c="blue"
-          style={{ textDecoration: "underline" }}
-        >
-          Assets
-        </Text>
-      </Group>
-      <WalletButton />
-    </Group>
-  </Group>
 );
 
 export default Header;
