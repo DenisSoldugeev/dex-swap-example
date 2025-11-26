@@ -39,7 +39,6 @@ const WalletButton: FC = () => {
           ◆ {formatAddress(address)}
         </Text>
       )}
-      <TonConnectButton />
     </Group>
   );
 };

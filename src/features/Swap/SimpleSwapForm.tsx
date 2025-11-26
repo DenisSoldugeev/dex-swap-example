@@ -5,7 +5,6 @@ import {
   Group,
   NumberInput,
   Text,
-  Paper,
   Alert,
   Select,
   ActionIcon,
@@ -14,17 +13,13 @@ import {
   Avatar,
 } from "@mantine/core";
 import { IconArrowsExchange } from "@tabler/icons-react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { StonApiClient, AssetTag } from "@ston-fi/api";
-import { useTonConnect } from "@/shared/ton/useTonConnect";
+import { Client } from "@ston-fi/sdk";
+import { dexFactory } from "@ston-fi/sdk";
+import { useTonConnectUI, useTonAddress } from "@tonconnect/ui-react";
 import { useConsoleLogger } from "@/features/Console/useConsoleLogger";
-import {
-  buildSwapTransaction,
-  getSwapQuote,
-  type SwapConfig,
-} from "@/shared/api/stonfiSwap";
-
-const FIVE_MINUTES = 5 * 60;
+import SwapSimulationDetails from "./SwapSimulationDetails";
 
 // Fetch assets with high/medium liquidity
 const fetchAssets = async () => {
@@ -37,23 +32,16 @@ const fetchAssets = async () => {
   return client.queryAssets({ condition });
 };
 
-const formatUnits = (value: bigint, decimals: number) => {
-  const raw = value.toString();
-  if (decimals === 0) return raw;
-  const padded = raw.padStart(decimals + 1, "0");
-  const integer = padded.slice(0, -decimals) || "0";
-  const fraction = padded.slice(-decimals).replace(/0+$/, "");
-  return fraction ? `${integer}.${fraction}` : integer;
-};
-
 const SimpleSwapForm = () => {
   const [fromAssetAddress, setFromAssetAddress] = useState<string>("");
   const [toAssetAddress, setToAssetAddress] = useState<string>("");
   const [amountIn, setAmountIn] = useState<string | number>(1);
   const [error, setError] = useState<string | null>(null);
   const [simulationResult, setSimulationResult] = useState<any>(null);
+  const [isSwapping, setIsSwapping] = useState(false);
 
-  const { walletAddress, isConnected, sendTransaction } = useTonConnect();
+  const [tonConnectUI] = useTonConnectUI();
+  const userAddress = useTonAddress();
   const { addLog } = useConsoleLogger();
 
   // Fetch assets query
@@ -67,16 +55,12 @@ const SimpleSwapForm = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Set default assets when loaded
+  // Log assets loaded
   useEffect(() => {
-    if (assets.length > 0 && !fromAssetAddress && !toAssetAddress) {
-      setFromAssetAddress(assets[0].contractAddress);
-      if (assets[1]) {
-        setToAssetAddress(assets[1].contractAddress);
-      }
+    if (assets.length > 0) {
       addLog("info", `Loaded ${assets.length} assets from STON.fi`);
     }
-  }, [assets, fromAssetAddress, toAssetAddress, addLog]);
+  }, [assets, addLog]);
 
   // Find selected assets
   const fromAsset = useMemo(
@@ -89,32 +73,52 @@ const SimpleSwapForm = () => {
     [assets, toAssetAddress],
   );
 
-  // Build swap config
-  const config: SwapConfig = useMemo(() => {
-    if (!fromAsset || !toAsset) {
-      return {
-        offerMinter: "",
-        askMinter: "",
-        offerDecimals: 9,
-        askDecimals: 9,
-      };
-    }
-
-    return {
-      offerMinter: fromAsset.contractAddress,
-      askMinter: toAsset.contractAddress,
-      offerDecimals: fromAsset.meta?.decimals ?? 9,
-      askDecimals: toAsset.meta?.decimals ?? 9,
-    };
-  }, [fromAsset, toAsset]);
-
   const numericAmount = useMemo(() => Number(amountIn), [amountIn]);
   const isAmountValid = Number.isFinite(numericAmount) && numericAmount > 0;
+  const isConnected = Boolean(userAddress);
 
   // Get asset display name
-  const getAssetLabel = (asset: typeof assets[0]) => {
+  const getAssetLabel = (asset: (typeof assets)[0]) => {
     return asset.meta?.symbol || asset.meta?.displayName || "Token";
   };
+
+  // Auto-simulate when all parameters are ready
+  useEffect(() => {
+    if (!fromAsset || !toAsset || !isAmountValid) {
+      setSimulationResult(null);
+      return;
+    }
+
+    const simulateTimeout = setTimeout(async () => {
+      try {
+        setError(null);
+        addLog("info", `Auto-simulating: ${numericAmount} ${getAssetLabel(fromAsset)} → ${getAssetLabel(toAsset)}`);
+
+        const client = new StonApiClient();
+        const fromDecimals = 10 ** (fromAsset.meta?.decimals ?? 9);
+        const offerUnits = (numericAmount * fromDecimals).toString();
+
+        const result = await client.simulateSwap({
+          offerAddress: fromAsset.contractAddress,
+          askAddress: toAsset.contractAddress,
+          slippageTolerance: "0.01",
+          offerUnits,
+        });
+
+        setSimulationResult(result);
+
+        const toDecimals = 10 ** (toAsset.meta?.decimals ?? 9);
+        const expectedOut = (Number(result.askUnits) / toDecimals).toFixed(4);
+        addLog("success", `Expected: ${expectedOut} ${getAssetLabel(toAsset)}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Auto-simulation failed";
+        setSimulationResult(null);
+        addLog("warning", `Auto-simulation: ${message}`);
+      }
+    }, 500); // Debounce 500ms
+
+    return () => clearTimeout(simulateTimeout);
+  }, [fromAsset, toAsset, numericAmount, isAmountValid, addLog]);
 
   const handleSwapTokens = () => {
     const temp = fromAssetAddress;
@@ -124,27 +128,33 @@ const SimpleSwapForm = () => {
     addLog("info", "Swapped token direction");
   };
 
-  // Simulate swap
-  const handleSimulate = async () => {
+  // Main swap function with auto-simulation
+  const handleSwap = async () => {
     if (!fromAsset || !toAsset || !isAmountValid) {
       setError("Please select tokens and enter valid amount");
       return;
     }
 
+    if (!userAddress) {
+      setError("Please connect wallet first");
+      return;
+    }
+
+    setIsSwapping(true);
+    setError(null);
+
     try {
-      setError(null);
+      // 1. Simulate swap first
       addLog("info", `Simulating swap: ${numericAmount} ${getAssetLabel(fromAsset)} → ${getAssetLabel(toAsset)}`);
 
       const client = new StonApiClient();
       const fromDecimals = 10 ** (fromAsset.meta?.decimals ?? 9);
-
-      // Convert amount to blockchain units
       const offerUnits = (numericAmount * fromDecimals).toString();
 
       const result = await client.simulateSwap({
         offerAddress: fromAsset.contractAddress,
         askAddress: toAsset.contractAddress,
-        slippageTolerance: "0.01", // 1% slippage
+        slippageTolerance: "0.01",
         offerUnits,
       });
 
@@ -152,67 +162,82 @@ const SimpleSwapForm = () => {
 
       const toDecimals = 10 ** (toAsset.meta?.decimals ?? 9);
       const expectedOut = (Number(result.askUnits) / toDecimals).toFixed(4);
-
       addLog("success", `Simulation: ${numericAmount} ${getAssetLabel(fromAsset)} → ${expectedOut} ${getAssetLabel(toAsset)}`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Simulation failed";
-      setError(message);
-      setSimulationResult(null);
-      addLog("error", `Simulation failed: ${message}`);
-    }
-  };
 
-  // Swap mutation
-  const swapMutation = useMutation({
-    mutationFn: async () => {
-      if (!walletAddress) throw new Error("Connect wallet first");
-      if (!isAmountValid) throw new Error("Enter amount > 0");
-      if (!fromAsset || !toAsset) throw new Error("Select tokens");
+      // 2. Initialize TON JSON-RPC client
+      const tonApiClient = new Client({
+        endpoint: "https://toncenter.com/api/v2/jsonRPC",
+      });
 
-      addLog(
-        "info",
-        `Initiating swap: ${numericAmount} ${getAssetLabel(fromAsset)} → ${getAssetLabel(toAsset)}`,
+      // 3. Use the embedded router info from the simulation result
+      const routerInfo = result.router;
+      const dexContracts = dexFactory(routerInfo);
+      const router = tonApiClient.open(
+        dexContracts.Router.create(routerInfo.address)
       );
+      const proxyTon = dexContracts.pTON.create(routerInfo.ptonMasterAddress);
 
-      // Get quote
-      const quote = await getSwapQuote(config, numericAmount);
-      const expectedOut = formatUnits(quote.expectedOut, config.askDecimals);
-      addLog(
-        "success",
-        `Quote: ${numericAmount} ${getAssetLabel(fromAsset)} ≈ ${expectedOut} ${getAssetLabel(toAsset)}`,
-      );
+      // 4. Prepare common transaction parameters
+      const sharedTxParams = {
+        userWalletAddress: userAddress,
+        offerAmount: result.offerUnits,
+        minAskAmount: result.minAskUnits,
+      };
 
-      // Build transaction
-      const tx = await buildSwapTransaction(
-        walletAddress,
-        numericAmount,
-        quote.minOut,
-        config,
-      );
+      // 5. Determine swap type and get transaction parameters
+      const getSwapParams = () => {
+        // TON -> Jetton
+        if (fromAsset.kind === 'Ton') {
+          return router.getSwapTonToJettonTxParams({
+            ...sharedTxParams,
+            proxyTon,
+            askJettonAddress: result.askAddress,
+          });
+        }
+        // Jetton -> TON
+        if (toAsset.kind === 'Ton') {
+          return router.getSwapJettonToTonTxParams({
+            ...sharedTxParams,
+            proxyTon,
+            offerJettonAddress: result.offerAddress,
+          });
+        }
+        // Jetton -> Jetton
+        return router.getSwapJettonToJettonTxParams({
+          ...sharedTxParams,
+          offerJettonAddress: result.offerAddress,
+          askJettonAddress: result.askAddress,
+        });
+      };
 
-      addLog("info", "Transaction prepared. Awaiting confirmation...");
+      const swapParams = await getSwapParams();
 
-      // Send transaction
-      await sendTransaction({
-        validUntil: Math.floor(Date.now() / 1000) + FIVE_MINUTES,
+      addLog("info", "Sending transaction...");
+
+      // 6. Send transaction via TonConnect
+      await tonConnectUI.sendTransaction({
+        validUntil: Date.now() + 5 * 60 * 1000,
         messages: [
           {
-            address: tx.to,
-            amount: tx.value,
-            payload: tx.data,
-          },
-        ],
+            address: swapParams.to.toString(),
+            amount: swapParams.value.toString(),
+            payload: swapParams.body?.toBoc().toString("base64"),
+          }
+        ]
       });
 
       addLog("success", "Transaction sent successfully!");
       setAmountIn(1);
-    },
-    onError: (e) => {
-      const message = e instanceof Error ? e.message : "Swap failed";
+      setSimulationResult(null);
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Swap failed";
       setError(message);
       addLog("error", `Swap failed: ${message}`);
-    },
-  });
+    } finally {
+      setIsSwapping(false);
+    }
+  };
 
   if (assetsLoading) {
     return (
@@ -354,58 +379,56 @@ const SimpleSwapForm = () => {
       />
 
       {/* Simulation Result */}
-      {simulationResult && toAsset && (
-        <Paper bg="terminalDark.5" withBorder p="md">
-          <Stack gap="xs">
-            <Text size="sm" c="cyan" fw={700} tt="uppercase" ta="center">
-              [ Swap Summary ]
-            </Text>
-            <Group justify="center" gap="sm">
-              <Text size="lg" fw={700} c="terminalGreen.5">
-                {numericAmount} {getAssetLabel(fromAsset!)}
-              </Text>
-              <Text c="dimmed">→</Text>
-              <Text size="lg" fw={700} c="terminalGreen.5">
-                {(Number(simulationResult.askUnits) / 10 ** (toAsset.meta?.decimals ?? 9)).toFixed(4)}{" "}
-                {getAssetLabel(toAsset)}
-              </Text>
-            </Group>
-            <Text size="xs" c="dimmed" ta="center">
-              Slippage tolerance: 1%
-            </Text>
-          </Stack>
-        </Paper>
+      {simulationResult && toAsset && fromAsset && (
+        <SwapSimulationDetails
+          offerAmount={numericAmount}
+          askAmount={
+            Number(simulationResult.askUnits) /
+            10 ** (toAsset.meta?.decimals ?? 9)
+          }
+          minAskAmount={
+            Number(simulationResult.minAskUnits) /
+            10 ** (toAsset.meta?.decimals ?? 9)
+          }
+          offerSymbol={getAssetLabel(fromAsset)}
+          askSymbol={getAssetLabel(toAsset)}
+          priceImpact={simulationResult.priceImpact}
+          slippageTolerance={simulationResult.slippageTolerance || "0.01"}
+          estimatedGas={
+            simulationResult.gasParams?.estimatedGasConsumption
+              ? (
+                  Number(simulationResult.gasParams.estimatedGasConsumption) /
+                  1e9
+                ).toFixed(2)
+              : undefined
+          }
+        />
       )}
 
       {/* Error Display */}
       {error && (
-        <Alert color="red" title="⚠ ERROR" onClose={() => setError(null)} withCloseButton>
+        <Alert
+          color="red"
+          title="⚠ ERROR"
+          onClose={() => setError(null)}
+          withCloseButton
+        >
           {error}
         </Alert>
       )}
 
-      {/* Action Buttons */}
-      <Group grow>
-        <Button
-          variant="outline"
-          color="cyan"
-          size="lg"
-          onClick={handleSimulate}
-          disabled={!isAmountValid || !fromAsset || !toAsset}
-        >
-          Simulate
-        </Button>
-        <Button
-          variant="filled"
-          color="terminalGreen"
-          size="lg"
-          onClick={() => swapMutation.mutate()}
-          loading={swapMutation.isPending}
-          disabled={!isConnected || !isAmountValid || !fromAsset || !toAsset}
-        >
-          Swap
-        </Button>
-      </Group>
+      {/* Action Button */}
+      <Button
+        variant="filled"
+        color="terminalGreen"
+        size="lg"
+        fullWidth
+        onClick={handleSwap}
+        loading={isSwapping}
+        disabled={!isConnected || !isAmountValid || !fromAsset || !toAsset}
+      >
+        {isSwapping ? "Processing..." : "Swap"}
+      </Button>
     </Stack>
   );
 };

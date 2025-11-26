@@ -1,3 +1,4 @@
+import {TonConnectButton} from "@tonconnect/ui-react";
 import type {FC} from "react";
 import {Group, Text} from "@mantine/core";
 import WalletButton from "../features/Wallet/WalletButton";
@@ -11,7 +12,7 @@ export const Header: FC = () => (
             </Text>
         </Group>
         <Group gap="lg" align="center">
-            <WalletButton/>
+            <TonConnectButton />
         </Group>
     </Group>
 );
