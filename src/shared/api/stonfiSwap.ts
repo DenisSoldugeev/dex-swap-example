@@ -1,5 +1,5 @@
-import { beginCell, Address, TonClient4 } from "@ton/ton";
-import { DEX } from "@ston-fi/sdk";
+import {DEX} from "@ston-fi/sdk";
+import {Address, beginCell, TonClient4} from "@ton/ton";
 
 // Mainnet HTTP endpoint; replace with your reliable provider if needed.
 const client = new TonClient4({ endpoint: "https://mainnet-v4.tonhubapi.com" });
@@ -15,8 +15,8 @@ export type SwapConfig = {
 };
 
 export const DEFAULT_SWAP_CONFIG: SwapConfig = {
-  offerMinter: "EQCjDWk_lny7JRjzfD0CYR9eLj9S1bNs7oKgPIsENcYIu5cJ", // STON
-  askMinter: "EQCWNM6CTi7d4zJFqeSa9u_oB0te_AKLi6dOa_8uTrX1FIJQ", // jUSDT
+  offerMinter: "EQCjDWk_lny7JRjzfD0CYR9eLj9S1bNs7oKgPIsENcYIu5cJ",
+  askMinter: "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs",
   offerDecimals: 9,
   askDecimals: 6,
 };
