@@ -42,9 +42,9 @@ export const REFERRAL_CONFIG = {
  */
 export const calculateReferralEarnings = (
   swapAmountUsd: number,
-  feeBps: number = REFERRAL_CONFIG.referrerFeeBps
+  feeBps: string = REFERRAL_CONFIG.referrerFeeBps
 ): number => {
-  return swapAmountUsd * (feeBps / 10000);
+  return swapAmountUsd * (+feeBps / 10000);
 };
 
 /**
