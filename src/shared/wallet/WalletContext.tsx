@@ -1,7 +1,8 @@
+import {decrypt, encrypt, getEncryptionPassword} from '@/shared/utils/crypto';
 import {Address, Cell, SendMode} from '@ton/core';
 import {mnemonicToPrivateKey} from '@ton/crypto';
 import {internal, TonClient4, WalletContractV5R1} from '@ton/ton';
-import {createContext, ReactNode, useCallback, useContext, useState} from 'react';
+import {createContext, ReactNode, useCallback, useContext, useEffect, useState} from 'react';
 
 interface WalletContextType {
   wallet: WalletContractV5R1 | null;
@@ -53,6 +54,40 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [wallet, setWallet] = useState<WalletContractV5R1 | null>(null);
   const [address, setAddress] = useState<string | null>(null);
 
+  // Auto-load wallet from localStorage on mount
+  useEffect(() => {
+    const loadWallet = async () => {
+      try {
+        const encryptedMnemonic = localStorage.getItem('wallet_mnemonic_encrypted');
+        if (!encryptedMnemonic) {
+          return; // No wallet stored
+        }
+
+        // Decrypt mnemonic
+        const password = getEncryptionPassword();
+        const mnemonic = await decrypt<string[]>(encryptedMnemonic, password);
+
+        // Generate keypair and wallet
+        const keyPair = await mnemonicToPrivateKey(mnemonic);
+        const workchain = 0;
+        const walletContract = WalletContractV5R1.create({
+          workchain,
+          publicKey: keyPair.publicKey,
+        });
+
+        setWallet(walletContract);
+        setAddress(walletContract.address.toString());
+        console.log('✅ Wallet loaded from storage');
+      } catch (error) {
+        console.error('Failed to load wallet from storage:', error);
+        // Clear corrupted data
+        localStorage.removeItem('wallet_mnemonic_encrypted');
+      }
+    };
+
+    loadWallet();
+  }, []);
+
   const importWallet = useCallback(async (mnemonic: string[]) => {
     try {
       // Generate keypair from mnemonic
@@ -69,8 +104,12 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       setWallet(walletContract);
       setAddress(walletContract.address.toString());
 
-      // Store in sessionStorage for persistence during session
-      sessionStorage.setItem('wallet_mnemonic', JSON.stringify(mnemonic));
+      // Encrypt and store in localStorage
+      const password = getEncryptionPassword();
+      const encryptedMnemonic = await encrypt(mnemonic, password);
+      localStorage.setItem('wallet_mnemonic_encrypted', encryptedMnemonic);
+
+      console.log('✅ Wallet imported and encrypted successfully');
     } catch (error) {
       console.error('Failed to import wallet:', error);
       throw new Error('Invalid mnemonic phrase');
@@ -80,7 +119,8 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const clearWallet = useCallback(() => {
     setWallet(null);
     setAddress(null);
-    sessionStorage.removeItem('wallet_mnemonic');
+    localStorage.removeItem('wallet_mnemonic_encrypted');
+    console.log('✅ Wallet cleared');
   }, []);
 
   const sendTransaction = useCallback(
@@ -90,13 +130,15 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       }
 
       return retryWithBackoff(async () => {
-        // Get mnemonic from session storage
-        const mnemonicStr = sessionStorage.getItem('wallet_mnemonic');
-        if (!mnemonicStr) {
-          throw new Error('Mnemonic not found in session');
+        // Get encrypted mnemonic from localStorage
+        const encryptedMnemonic = localStorage.getItem('wallet_mnemonic_encrypted');
+        if (!encryptedMnemonic) {
+          throw new Error('Encrypted mnemonic not found in storage');
         }
 
-        const mnemonic = JSON.parse(mnemonicStr) as string[];
+        // Decrypt mnemonic
+        const password = getEncryptionPassword();
+        const mnemonic = await decrypt<string[]>(encryptedMnemonic, password);
         const keyPair = await mnemonicToPrivateKey(mnemonic);
 
         // Use TonClient4 provider for wallet operations

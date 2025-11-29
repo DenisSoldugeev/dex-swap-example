@@ -1,4 +1,5 @@
 import {useConsoleLogger} from "@/features/Console/useConsoleLogger";
+import {decrypt, getEncryptionPassword} from "@/shared/utils/crypto";
 import {useWallet} from "@/shared/wallet/WalletContext";
 import {
     Alert,
@@ -164,13 +165,15 @@ const CyclicSwapForm = () => {
       // 5. АВТОМАТИЧЕСКАЯ ПОДПИСЬ И ОТПРАВКА
       addLog("info", "Auto-signing transaction...");
 
-      // Получаем мнемоник из sessionStorage
-      const mnemonicStr = sessionStorage.getItem("wallet_mnemonic");
-      if (!mnemonicStr) {
+      // Получаем зашифрованную мнемонику из localStorage
+      const encryptedMnemonic = localStorage.getItem("wallet_mnemonic_encrypted");
+      if (!encryptedMnemonic) {
         throw new Error("Wallet not imported");
       }
 
-      const mnemonic = JSON.parse(mnemonicStr) as string[];
+      // Расшифровываем мнемонику
+      const password = getEncryptionPassword();
+      const mnemonic = await decrypt<string[]>(encryptedMnemonic, password);
       const keyPair = await mnemonicToPrivateKey(mnemonic);
 
       // Создаём wallet contract V5R1
@@ -333,7 +336,7 @@ const CyclicSwapForm = () => {
             continue;
           }
 
-          throw cycleError;
+throw cycleError;
         }
       }
 

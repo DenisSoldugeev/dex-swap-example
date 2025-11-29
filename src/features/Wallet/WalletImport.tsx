@@ -81,10 +81,10 @@ const WalletImport = () => {
                 • Use a separate wallet with small funds for trading
               </Text>
               <Text size="xs">
-                • Seed phrase is stored only in browser session (not sent anywhere)
+                • Seed phrase is encrypted and stored in browser (not sent anywhere)
               </Text>
               <Text size="xs">
-                • Clear session when done trading
+                • Wallet persists between sessions until manually cleared
               </Text>
             </Stack>
           </Alert>
@@ -137,13 +137,13 @@ const WalletImport = () => {
             1. Enter your 12 or 24 word seed phrase
           </Text>
           <Text size="xs" c="dimmed">
-            2. Wallet will be imported and stored in browser session
+            2. Seed phrase is encrypted and stored in browser localStorage
           </Text>
           <Text size="xs" c="dimmed">
             3. All swaps will be signed automatically without popups
           </Text>
           <Text size="xs" c="dimmed">
-            4. Session clears when you close the browser
+            4. Wallet persists until you click "Clear Wallet" button
           </Text>
         </Stack>
       </Card>
