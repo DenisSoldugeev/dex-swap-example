@@ -1,25 +1,25 @@
-import { useState, useMemo, useEffect } from "react";
+import {useConsoleLogger} from "@/features/Console/useConsoleLogger";
+import {REFERRAL_CONFIG} from "@/shared/config/referral";
 import {
-  Stack,
-  Button,
-  Group,
-  NumberInput,
-  Text,
-  Alert,
-  Select,
-  ActionIcon,
-  Center,
-  Loader,
-  Avatar,
+    ActionIcon,
+    Alert,
+    Avatar,
+    Button,
+    Center,
+    Group,
+    Loader,
+    NumberInput,
+    Select,
+    Stack,
+    Text,
 } from "@mantine/core";
-import { IconArrowsExchange } from "@tabler/icons-react";
-import { useQuery } from "@tanstack/react-query";
-import { StonApiClient, AssetTag } from "@ston-fi/api";
-import { Client } from "@ston-fi/sdk";
-import { dexFactory } from "@ston-fi/sdk";
-import { Cell } from "@ton/core";
-import { useTonConnectUI, useTonAddress } from "@tonconnect/ui-react";
-import { useConsoleLogger } from "@/features/Console/useConsoleLogger";
+import {AssetTag, StonApiClient} from "@ston-fi/api";
+import {Client, dexFactory} from "@ston-fi/sdk";
+import {IconArrowsExchange} from "@tabler/icons-react";
+import {useQuery} from "@tanstack/react-query";
+import {Cell} from "@ton/core";
+import {useTonAddress, useTonConnectUI} from "@tonconnect/ui-react";
+import {useEffect, useMemo, useState} from "react";
 import SwapSimulationDetails from "./SwapSimulationDetails";
 
 // Fetch assets with high/medium liquidity
@@ -104,6 +104,8 @@ const SimpleSwapForm = () => {
           askAddress: toAsset.contractAddress,
           slippageTolerance: "0.01",
           offerUnits,
+          referralAddress: REFERRAL_CONFIG.referrerAddress,
+          referralFeeBps: REFERRAL_CONFIG.referrerFeeBps,
         });
 
         setSimulationResult(result);
@@ -157,6 +159,9 @@ const SimpleSwapForm = () => {
         askAddress: toAsset.contractAddress,
         slippageTolerance: "0.01",
         offerUnits,
+        // Referral parameters for earning fees
+        referralAddress: REFERRAL_CONFIG.referrerAddress,
+        referralFeeBps: REFERRAL_CONFIG.referrerFeeBps,
       });
 
       setSimulationResult(result);

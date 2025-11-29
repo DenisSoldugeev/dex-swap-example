@@ -1,4 +1,5 @@
 import {useConsoleLogger} from "@/features/Console/useConsoleLogger";
+import {REFERRAL_CONFIG} from "@/shared/config/referral";
 import {decrypt, getEncryptionPassword} from "@/shared/utils/crypto";
 import {useWallet} from "@/shared/wallet/WalletContext";
 import {
@@ -108,6 +109,8 @@ const CyclicSwapForm = () => {
         askAddress: toAsset.contractAddress,
         slippageTolerance: "0.01",
         offerUnits,
+        referralAddress: REFERRAL_CONFIG.referrerAddress,
+        referralFeeBps: REFERRAL_CONFIG.referrerFeeBps,
       });
 
       const toDecimals = 10 ** (toAsset.meta?.decimals ?? 9);
