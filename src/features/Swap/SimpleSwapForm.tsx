@@ -26,6 +26,7 @@ const SimpleSwapForm = () => {
   const [fromAssetAddress, setFromAssetAddress] = useState<string>("");
   const [toAssetAddress, setToAssetAddress] = useState<string>("");
   const [amountIn, setAmountIn] = useState<string | number>(1);
+  const [slippagePct, setSlippagePct] = useState<number>(1); // percent, e.g. 1 = 1%
   const [error, setError] = useState<string | null>(null);
   const [simulationResult, setSimulationResult] = useState<SwapSimulationResult | null>(null);
   const [isSwapping, setIsSwapping] = useState(false);
@@ -69,6 +70,7 @@ const SimpleSwapForm = () => {
 
   const formatUnits = (units: string, decimals: number) =>
     Number(units) / 10 ** decimals;
+  const formatDiff = (a: number, b: number) => (a - b).toFixed(4);
 
   // Get asset display name
   const getAssetLabel = (asset: (typeof assets)[0]) => {
@@ -91,9 +93,7 @@ const SimpleSwapForm = () => {
           offer: fromAsset,
           ask: toAsset,
           amount: numericAmount,
-          slippageTolerance: "0.01",
-          referralAddress: REFERRAL_CONFIG.referrerAddress,
-          referralFeeBps: REFERRAL_CONFIG.referrerFeeBps,
+          slippageTolerance: (slippagePct / 100).toString(),
         });
 
         setSimulationResult(result);
@@ -102,7 +102,17 @@ const SimpleSwapForm = () => {
           result.askUnits,
           toAsset.meta?.decimals ?? 9,
         ).toFixed(4);
+        const minOut = formatUnits(
+          result.minAskUnits,
+          toAsset.meta?.decimals ?? 9,
+        ).toFixed(4);
+        const loss = formatDiff(Number(expectedOut), Number(minOut));
+
         addLog("success", `Expected: ${expectedOut} ${getAssetLabel(toAsset)}`);
+        addLog(
+          "info",
+          `Slippage buffer (${slippagePct}%): you may get as low as ${minOut} ${getAssetLabel(toAsset)} (buffer ${loss})`,
+        );
       } catch (err) {
         const message = err instanceof Error ? err.message : "Auto-simulation failed";
         setSimulationResult(null);
@@ -144,7 +154,7 @@ const SimpleSwapForm = () => {
         offer: fromAsset,
         ask: toAsset,
         amount: numericAmount,
-        slippageTolerance: "0.01",
+        slippageTolerance: (slippagePct / 100).toString(),
         // Referral parameters for earning fees
         referralAddress: REFERRAL_CONFIG.referrerAddress,
         referralFeeBps: REFERRAL_CONFIG.referrerFeeBps,
@@ -154,7 +164,13 @@ const SimpleSwapForm = () => {
 
       const toDecimals = toAsset.meta?.decimals ?? 9;
       const expectedOut = formatUnits(result.askUnits, toDecimals).toFixed(4);
+      const minOut = formatUnits(result.minAskUnits, toDecimals).toFixed(4);
+      const loss = formatDiff(Number(expectedOut), Number(minOut));
       addLog("success", `Simulation: ${numericAmount} ${getAssetLabel(fromAsset)} → ${expectedOut} ${getAssetLabel(toAsset)}`);
+      addLog(
+        "info",
+        `Slippage buffer (${slippagePct}%): may get as low as ${minOut} ${getAssetLabel(toAsset)} (buffer ${loss})`,
+      );
 
       // 2. Build tx params via shared swap helper
       const swapParams = await buildSwapTx(
@@ -190,6 +206,7 @@ const SimpleSwapForm = () => {
       addLog("info", `   From: ${numericAmount} ${getAssetLabel(fromAsset)}`);
       addLog("info", `   To: ~${expectedOut} ${getAssetLabel(toAsset)}`);
       addLog("info", `   Min: ${(Number(result.minAskUnits) / toDecimals).toFixed(4)} ${getAssetLabel(toAsset)}`);
+      addLog("info", `   Slippage buffer (${slippagePct}%): up to ${loss} ${getAssetLabel(toAsset)} loss if price moves`);
       addLog("info", `   Slippage: ${(parseFloat(result.slippageTolerance || "0.01") * 100).toFixed(2)}%`);
 
       if (result.priceImpact) {
@@ -309,6 +326,24 @@ const SimpleSwapForm = () => {
           )
         }
         rightSectionWidth={80}
+      />
+      <NumberInput
+        label={
+          <Text size="sm" fw={600} c="terminalGreen.5" tt="uppercase">
+            &gt; Slippage tolerance (%)
+          </Text>
+        }
+        value={slippagePct}
+        onChange={(val) => {
+          setSlippagePct(typeof val === "number" ? val : slippagePct);
+          setError(null);
+          setSimulationResult(null);
+        }}
+        min={0}
+        max={50}
+        step={0.1}
+        decimalScale={2}
+        size="md"
       />
 
       {/* Swap Direction Indicator */}

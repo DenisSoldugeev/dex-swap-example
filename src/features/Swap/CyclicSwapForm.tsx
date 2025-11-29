@@ -7,6 +7,7 @@ import {decrypt, getEncryptionPassword} from "@/shared/utils/crypto";
 import {useWallet} from "@/shared/wallet/WalletContext";
 import {
     Alert,
+    Button as MantineButton,
     Avatar,
     Badge,
     Button,
@@ -18,12 +19,14 @@ import {
     Select,
     Stack,
     Text,
+    Modal,
 } from "@mantine/core";
 import {useQuery} from "@tanstack/react-query";
 import {SendMode} from "@ton/core";
 import {mnemonicToPrivateKey} from "@ton/crypto";
 import {internal, WalletContractV5R1} from "@ton/ton";
 import {useCallback, useMemo, useState} from "react";
+import {Address} from "@ton/core";
 
 const CyclicSwapForm = () => {
   const [tokenAddress, setTokenAddress] = useState<string>("");
@@ -35,6 +38,8 @@ const CyclicSwapForm = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [currentCycle, setCurrentCycle] = useState(0);
   const [currentStep, setCurrentStep] = useState<"idle" | "buying" | "waiting" | "selling">("idle");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [slippagePct, setSlippagePct] = useState<number>(1); // percent, e.g. 1 = 1%
 
   const { address: userAddress } = useWallet();
   const { addLog } = useConsoleLogger();
@@ -76,6 +81,16 @@ const CyclicSwapForm = () => {
     return asset.meta?.symbol || asset.meta?.displayName || "Token";
   };
 
+  const validationError = () => {
+    if (!selectedToken || !usdtToken || !isAmountValid || !isCyclesValid) {
+      return "Please configure all parameters correctly";
+    }
+    if (!userAddress) {
+      return "Please connect wallet first";
+    }
+    return null;
+  };
+
   // Execute single swap - АВТОМАТИЧЕСКАЯ ПОДПИСЬ
   const executeSwap = useCallback(
     async (
@@ -92,17 +107,21 @@ const CyclicSwapForm = () => {
         offer: fromAsset,
         ask: toAsset,
         amount,
-        slippageTolerance: "0.01",
-        referralAddress: REFERRAL_CONFIG.referrerAddress,
-        referralFeeBps: REFERRAL_CONFIG.referrerFeeBps,
+        slippageTolerance: (slippagePct / 100).toString(),
       });
 
       const toDecimals = toAsset.meta?.decimals ?? 9;
       const expectedOut = formatUnits(result.askUnits, toDecimals);
+      const minOut = formatUnits(result.minAskUnits, toDecimals);
+      const slippageBuffer = expectedOut - minOut;
 
       addLog(
         "info",
         `Swap: ${amount.toFixed(2)} ${getAssetLabel(fromAsset)} → ${expectedOut.toFixed(4)} ${getAssetLabel(toAsset)}`,
+      );
+      addLog(
+        "info",
+        `Slippage buffer (${slippagePct}%): may get as low as ${minOut.toFixed(4)} ${getAssetLabel(toAsset)} (buffer ${slippageBuffer.toFixed(4)})`,
       );
 
       // 2. Get tx params via shared builder
@@ -202,6 +221,8 @@ const CyclicSwapForm = () => {
 
       return {
         expectedOut,
+        minOut,
+        slippageBuffer,
       };
     },
     [userAddress, addLog, getAssetLabel],
@@ -209,29 +230,33 @@ const CyclicSwapForm = () => {
 
   // Main cycle function
   const startCyclicSwap = async () => {
-    if (!selectedToken || !usdtToken || !isAmountValid || !isCyclesValid) {
-      setError("Please configure all parameters correctly");
+    const maybeError = validationError();
+    if (maybeError) {
+      setError(maybeError);
       return;
     }
 
-    if (!userAddress) {
-      setError("Please connect wallet first");
-      return;
-    }
+    // После валидации объекты гарантированно заданы
+    const token = selectedToken!;
+    const usdt = usdtToken!;
+    const tokenLabel = getAssetLabel(token);
+    const usdtLabel = getAssetLabel(usdt);
 
+    setConfirmOpen(false);
     setIsRunning(true);
     setError(null);
     setCurrentCycle(0);
 
     addLog("info", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     addLog("success", "🔄 Starting cyclic swap");
-    addLog("info", `Token: ${getAssetLabel(selectedToken)}`);
-    addLog("info", `Amount: ${numericAmount} USDT`);
+    addLog("info", `Token: ${tokenLabel}`);
+    addLog("info", `Amount: ${numericAmount} ${usdtLabel}`);
     addLog("info", `Cycles: ${numericCycles}`);
     addLog("info", `Delay: ${numericDelay}s`);
     addLog("info", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let currentAmount = numericAmount;
+    let totalSlippageUsdtBuffer = 0;
 
     try {
       for (let i = 0; i < numericCycles; i++) {
@@ -239,16 +264,16 @@ const CyclicSwapForm = () => {
 
         try {
           // Step 1: Buy token with USDT
-          addLog("info", `\n[Cycle ${i + 1}/${numericCycles}] Step 1: Buying ${getAssetLabel(selectedToken)}`);
+          addLog("info", `\n[Cycle ${i + 1}/${numericCycles}] Step 1: Buying ${tokenLabel}`);
           setCurrentStep("buying");
 
           const buyResult = await executeSwap(
-            usdtToken,
-            selectedToken,
+            usdt,
+            token,
             currentAmount,
           );
 
-          addLog("success", `Bought ${buyResult.expectedOut.toFixed(4)} ${getAssetLabel(selectedToken)}`);
+          addLog("success", `Bought ${buyResult.expectedOut.toFixed(4)} ${tokenLabel}`);
 
           // Небольшая пауза перед следующим свопом (транзакция уже подтверждена внутри executeSwap)
           addLog("info", `Pausing 5s before next swap...`);
@@ -260,10 +285,13 @@ const CyclicSwapForm = () => {
           setCurrentStep("selling");
 
           const sellResult = await executeSwap(
-            selectedToken,
-            usdtToken,
+            token,
+            usdt,
             buyResult.expectedOut,
           );
+
+          // Accumulate slippage buffer on the USDT leg
+          totalSlippageUsdtBuffer += sellResult.slippageBuffer;
 
           currentAmount = sellResult.expectedOut;
           addLog("success", `Sold for ${currentAmount.toFixed(4)} USDT`);
@@ -301,6 +329,10 @@ throw cycleError;
         diff >= 0 ? "success" : "warning",
         `Difference: ${diff >= 0 ? "+" : ""}${diff.toFixed(4)} USDT (${diff >= 0 ? "+" : ""}${diffPercent}%)`,
       );
+      addLog(
+        "info",
+        `Total slippage buffer on USDT legs (${slippagePct}% each): up to ${totalSlippageUsdtBuffer.toFixed(4)} USDT could be lost to price moves within tolerance.`,
+      );
       addLog("info", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Cyclic swap failed";
@@ -334,8 +366,55 @@ throw cycleError;
 
   const progress = numericCycles > 0 ? (currentCycle / numericCycles) * 100 : 0;
 
+  const confirmationSummary = (
+    <Stack gap="xs">
+      <Text size="sm" c="dimmed">
+        Token: {selectedToken ? getAssetLabel(selectedToken) : "—"}
+      </Text>
+      <Text size="sm" c="dimmed">
+        Amount per cycle: {numericAmount.toFixed(2)} USDT
+      </Text>
+      <Text size="sm" c="dimmed">
+        Cycles: {numericCycles}
+      </Text>
+      <Text size="sm" c="dimmed">
+        Pause between operations: {Math.max(numericDelay, 15)} seconds
+      </Text>
+      <Text size="sm" c="dimmed">
+        Slippage tolerance: {slippagePct}%
+      </Text>
+    </Stack>
+  );
+
   return (
     <Stack gap="lg">
+      <Modal.Root
+        opened={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        centered
+      >
+        <Modal.Overlay />
+        <Modal.Content>
+          <Modal.Header bg={"transparent"}>
+            <Modal.Title>Confirm cyclic swap</Modal.Title>
+            <Modal.CloseButton />
+          </Modal.Header>
+          <Modal.Body>
+            <Stack gap="md">
+              {confirmationSummary}
+              <Group justify="flex-end">
+                <Button variant="default" onClick={() => setConfirmOpen(false)}>
+                  Cancel
+                </Button>
+                <MantineButton color="terminalGreen" onClick={startCyclicSwap}>
+                  Start
+                </MantineButton>
+              </Group>
+            </Stack>
+          </Modal.Body>
+        </Modal.Content>
+      </Modal.Root>
+
       {/* Progress Card */}
       {isRunning && (
         <Card padding="lg" withBorder>
@@ -431,6 +510,34 @@ throw cycleError;
         rightSectionWidth={60}
       />
 
+      {/* Slippage */}
+      <NumberInput
+        label={
+          <Text size="sm" fw={600} c="terminalGreen.5" tt="uppercase">
+            &gt; Slippage tolerance (%)
+          </Text>
+        }
+        value={slippagePct}
+        onChange={(val) => {
+          setSlippagePct(typeof val === "number" ? val : slippagePct);
+          setError(null);
+        }}
+        min={0}
+        max={50}
+        step={0.1}
+        decimalScale={2}
+        placeholder="1.00"
+        size="md"
+        disabled={isRunning}
+        description="If execution price moves beyond this percent, swap will fail (minAsk)."
+        rightSection={
+          <Text size="sm" c="dimmed">
+            %
+          </Text>
+        }
+        rightSectionWidth={30}
+      />
+
       {/* Cycles Count */}
       <NumberInput
         label={
@@ -523,7 +630,14 @@ throw cycleError;
         color={isRunning ? "red" : "terminalGreen"}
         size="lg"
         fullWidth
-        onClick={startCyclicSwap}
+        onClick={() => {
+          const maybeError = validationError();
+          if (maybeError) {
+            setError(maybeError);
+            return;
+          }
+          setConfirmOpen(true);
+        }}
         loading={isRunning}
         disabled={
           !isConnected ||
