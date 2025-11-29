@@ -1,10 +1,10 @@
 import {Address, Cell, SendMode} from '@ton/core';
 import {mnemonicToPrivateKey} from '@ton/crypto';
-import {internal, TonClient4, WalletContractV4} from '@ton/ton';
+import {internal, TonClient4, WalletContractV5R1} from '@ton/ton';
 import {createContext, ReactNode, useCallback, useContext, useState} from 'react';
 
 interface WalletContextType {
-  wallet: WalletContractV4 | null;
+  wallet: WalletContractV5R1 | null;
   address: string | null;
   isImported: boolean;
   importWallet: (mnemonic: string[]) => Promise<void>;
@@ -50,7 +50,7 @@ const client = new TonClient4({
 });
 
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
-  const [wallet, setWallet] = useState<WalletContractV4 | null>(null);
+  const [wallet, setWallet] = useState<WalletContractV5R1 | null>(null);
   const [address, setAddress] = useState<string | null>(null);
 
   const importWallet = useCallback(async (mnemonic: string[]) => {
@@ -58,9 +58,9 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       // Generate keypair from mnemonic
       const keyPair = await mnemonicToPrivateKey(mnemonic);
 
-      // Create wallet contract
+      // Create wallet contract V5R1
       const workchain = 0;
-      const walletContract = WalletContractV4.create({
+      const walletContract = WalletContractV5R1.create({
         workchain,
         publicKey: keyPair.publicKey,
       });

@@ -19,7 +19,7 @@ import {Client, dexFactory} from "@ston-fi/sdk";
 import {useQuery} from "@tanstack/react-query";
 import {SendMode} from "@ton/core";
 import {mnemonicToPrivateKey} from "@ton/crypto";
-import {internal, TonClient4, WalletContractV4} from "@ton/ton";
+import {internal, TonClient4, WalletContractV5R1} from "@ton/ton";
 import {useCallback, useMemo, useState} from "react";
 
 // TonClient4 for getting seqno
@@ -173,8 +173,8 @@ const CyclicSwapForm = () => {
       const mnemonic = JSON.parse(mnemonicStr) as string[];
       const keyPair = await mnemonicToPrivateKey(mnemonic);
 
-      // Создаём wallet contract
-      const wallet = WalletContractV4.create({
+      // Создаём wallet contract V5R1
+      const wallet = WalletContractV5R1.create({
         workchain: 0,
         publicKey: keyPair.publicKey,
       });
