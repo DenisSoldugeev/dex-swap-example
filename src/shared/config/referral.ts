@@ -4,15 +4,8 @@
  * How it works:
  * - 1 bps = 0.01%
  */
-
 export const REFERRAL_CONFIG = {
   referrerAddress: 'UQCwy3KPorSYTJ_gD2gttqVjVf1ICUU_OEnssb1CxxVK8Ecu',
-
-  /**
-   * Referral fee in basis points (bps)
-   * 1 bps = 0.01%
-   * Range: 1-100 bps (0.01% - 1%)
-   */
   referrerFeeBps: '100',
   flexibleReferrerFee: true,
 } as const;

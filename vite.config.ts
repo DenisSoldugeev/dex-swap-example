@@ -1,31 +1,29 @@
-import path from "node:path";
-import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
-import { TanStackRouterVite } from "@tanstack/router-vite-plugin";
+import path from "node:path";
+import {defineConfig} from "vite";
 
-// Vite config with React SWC for fast HMR and TS support
 export default defineConfig({
-  plugins: [
-    react(),
-  ],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "src"),
+    plugins: [
+        react(),
+    ],
+    resolve: {
+        alias: {
+            "@": path.resolve(__dirname, "src"),
+        },
     },
-  },
-  server: {
-    host: true,
-    port: 5190,
-    allowedHosts: ["localhost", ".cloudpub.ru"],
-  },
-  css: {
-    modules: {
-      localsConvention: "camelCaseOnly",
+    server: {
+        host: true,
+        port: 5190,
+        allowedHosts: true
     },
-    preprocessorOptions: {
-      scss: {
-          loadPaths: [path.resolve(__dirname, "src")],
-      },
+    css: {
+        modules: {
+            localsConvention: "camelCaseOnly",
+        },
+        preprocessorOptions: {
+            scss: {
+                loadPaths: [path.resolve(__dirname, "src")],
+            },
+        },
     },
-  },
 });

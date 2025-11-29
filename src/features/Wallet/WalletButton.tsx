@@ -1,8 +1,8 @@
-import type { FC } from "react";
-import { useEffect, useRef } from "react";
-import { Group, Text } from "@mantine/core";
-import { TonConnectButton, useTonWallet } from "@tonconnect/ui-react";
-import { useConsoleLogger } from "@/features/Console/useConsoleLogger";
+import {useConsoleLogger} from "@/features/Console/useConsoleLogger";
+import {Group, Text} from "@mantine/core";
+import {TonConnectButton, useTonWallet} from "@tonconnect/ui-react";
+import type {FC} from "react";
+import {useEffect, useRef} from "react";
 
 const formatAddress = (address: string) =>
   `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -39,6 +39,7 @@ const WalletButton: FC = () => {
           ◆ {formatAddress(address)}
         </Text>
       )}
+      <TonConnectButton />
     </Group>
   );
 };

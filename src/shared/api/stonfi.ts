@@ -13,7 +13,6 @@ export interface AssetSummary {
   priceUsd?: string;
 }
 
-// Fetches a simplified list of assets that UI components can render.
 export const fetchAssets = async (): Promise<AssetSummary[]> => {
   const assets = await stonClient.getAssets();
 
@@ -28,5 +27,3 @@ export const fetchAssets = async (): Promise<AssetSummary[]> => {
     priceUsd: asset.dexPriceUsd ?? asset.thirdPartyPriceUsd,
   }));
 };
-
-// Future extension: add more helpers (simulate swaps, fetch pools, etc.) and keep them typed here.

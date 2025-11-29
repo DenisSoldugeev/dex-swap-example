@@ -1,4 +1,4 @@
-import { createTheme, MantineColorsTuple } from "@mantine/core";
+import {createTheme, MantineColorsTuple} from "@mantine/core";
 
 const terminalGreen: MantineColorsTuple = [
   "#ccffe5",
@@ -18,7 +18,7 @@ const terminalDark: MantineColorsTuple = [
   "#3a4556",
   "#2d3748",
   "#252d3a",
-  "#1a202c", // primary dark - темно-серый, не черный
+  "#1a202c", // primary dark - dark gray, not black
   "#171d28",
   "#141924",
   "#111520",

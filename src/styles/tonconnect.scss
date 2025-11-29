@@ -1,6 +1,5 @@
-@use 'styles/variables';
+@use 'variables';
 
-// TonConnect Button customization for terminal theme
 :root {
   --tc-bg-color: #{variables.$color-bg-light} !important;
   --tc-border-color: #{variables.$color-border} !important;
@@ -9,8 +8,6 @@
   --tc-border-radius: #{variables.$border-radius} !important;
   --tc-font-family: #{variables.$font-mono} !important;
 }
-
-// TonConnect Modal customization
 div[class*="tc-modal"] {
   font-family: variables.$font-mono !important;
 
@@ -46,7 +43,6 @@ div[class*="tc-modal"] {
   }
 }
 
-// TonConnect Button in header
 button[data-tc-connect-button] {
   background: variables.$color-bg-light !important;
   border: 2px solid variables.$color-terminal-green-dark !important;

@@ -1,22 +1,14 @@
-import { useMemo, useState } from "react";
 import {
-  Alert,
-  Button,
-  Group,
-  NumberInput,
-  Stack,
-  Text,
-  TextInput,
-} from "@mantine/core";
-import { useMutation } from "@tanstack/react-query";
-import { useTonConnect } from "../../shared/ton/useTonConnect";
-import {
-  DEFAULT_SWAP_CONFIG,
-  buildSwapTransaction,
-  getSwapQuote,
-  type SwapConfig,
-  type SwapQuote,
-} from "../../shared/api/stonfiSwap";
+    buildSwapTransaction,
+    DEFAULT_SWAP_CONFIG,
+    getSwapQuote,
+    type SwapConfig,
+    type SwapQuote,
+} from "@/shared/api/stonfiSwap.ts";
+import {useTonConnect} from "@/shared/ton/useTonConnect.ts";
+import {Alert, Button, Group, NumberInput, Stack, Text, TextInput,} from "@mantine/core";
+import {useMutation} from "@tanstack/react-query";
+import {useMemo, useState} from "react";
 
 const FIVE_MINUTES = 5 * 60;
 
@@ -42,32 +34,32 @@ const SwapForm = () => {
 
   const ensureConfigIsFilled = () => {
     if (!config.offerMinter || !config.askMinter) {
-      throw new Error("Укажите адреса jetton-минтеров для оффера и аска");
+      throw new Error("Please specify jetton minter addresses for offer and ask");
     }
     if (config.offerDecimals < 0 || config.askDecimals < 0) {
-      throw new Error("Десятичность не может быть отрицательной");
+      throw new Error("Decimals cannot be negative");
     }
   };
 
   const quoteMutation = useMutation({
     mutationFn: async () => {
       ensureConfigIsFilled();
-      if (!isAmountValid) throw new Error("Введите количество > 0");
+      if (!isAmountValid) throw new Error("Enter amount > 0");
       const q = await getSwapQuote(config, numericAmount);
       setQuote(q);
       return q;
     },
     onError: (e) =>
       setError(
-        e instanceof Error ? e.message : "Не удалось получить котировку",
+        e instanceof Error ? e.message : "Failed to get quote",
       ),
   });
 
   const swapMutation = useMutation({
     mutationFn: async () => {
       ensureConfigIsFilled();
-      if (!walletAddress) throw new Error("Сначала подключите кошелек");
-      if (!isAmountValid) throw new Error("Введите количество > 0");
+      if (!walletAddress) throw new Error("Please connect wallet first");
+      if (!isAmountValid) throw new Error("Enter amount > 0");
 
       const currentQuote: SwapQuote =
         quote ?? (await getSwapQuote(config, numericAmount));
@@ -92,7 +84,7 @@ const SwapForm = () => {
       });
     },
     onError: (e) =>
-      setError(e instanceof Error ? e.message : "Свап не отправлен"),
+      setError(e instanceof Error ? e.message : "Swap failed"),
   });
 
   return (
@@ -102,7 +94,7 @@ const SwapForm = () => {
       </Group>
 
       <TextInput
-        label="Offer jetton minter (отдаём)"
+        label="Offer jetton minter (we give)"
         value={config.offerMinter}
         onChange={(e) =>
           setConfig((prev) => ({ ...prev, offerMinter: e.currentTarget.value }))
@@ -122,7 +114,7 @@ const SwapForm = () => {
       />
 
       <TextInput
-        label="Ask jetton minter (получаем)"
+        label="Ask jetton minter (we receive)"
         value={config.askMinter}
         onChange={(e) =>
           setConfig((prev) => ({ ...prev, askMinter: e.currentTarget.value }))
@@ -142,7 +134,7 @@ const SwapForm = () => {
       />
 
       <NumberInput
-        label="Количество (в offer токене)"
+        label="Amount (in offer token)"
         value={amountIn}
         onChange={(v) => setAmountIn(v === null ? "" : String(v))}
         min={0}
@@ -168,7 +160,7 @@ const SwapForm = () => {
       </Group>
 
       {quote && (
-        <Alert color="blue" title="Котировка">
+        <Alert color="blue" title="Quote">
           <Text>
             Expected out: {formatUnits(quote.expectedOut, config.askDecimals)}{" "}
             (raw {quote.expectedOut.toString()})
@@ -182,13 +174,13 @@ const SwapForm = () => {
       )}
 
       {(quoteMutation.isPending || swapMutation.isPending) && (
-        <Text>Обработка…</Text>
+        <Text>Processing...</Text>
       )}
 
       {error && (
         <Alert
           color="red"
-          title="Ошибка"
+          title="Error"
           onClose={() => setError(null)}
           closeButtonLabel="Close"
           withCloseButton
