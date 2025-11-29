@@ -1,5 +1,7 @@
 import {useConsoleLogger} from "@/features/Console/useConsoleLogger";
 import {REFERRAL_CONFIG} from "@/shared/config/referral";
+import {fetchLiquidAssets} from "@/shared/stonfi/assets";
+import {buildSwapTx, simulateSwap, type SwapSimulationResult, toTonConnectMessage,} from "@/shared/stonfi/swap";
 import {
     ActionIcon,
     Alert,
@@ -13,8 +15,6 @@ import {
     Stack,
     Text,
 } from "@mantine/core";
-import {AssetTag, StonApiClient} from "@ston-fi/api";
-import {Client, dexFactory} from "@ston-fi/sdk";
 import {IconArrowsExchange} from "@tabler/icons-react";
 import {useQuery} from "@tanstack/react-query";
 import {Cell} from "@ton/core";
@@ -22,23 +22,12 @@ import {useTonAddress, useTonConnectUI} from "@tonconnect/ui-react";
 import {useEffect, useMemo, useState} from "react";
 import SwapSimulationDetails from "./SwapSimulationDetails";
 
-// Fetch assets with high/medium liquidity
-const fetchAssets = async () => {
-  const client = new StonApiClient();
-  const condition = [
-    AssetTag.LiquidityVeryHigh,
-    AssetTag.LiquidityHigh,
-    AssetTag.LiquidityMedium,
-  ].join(" | ");
-  return client.queryAssets({ condition });
-};
-
 const SimpleSwapForm = () => {
   const [fromAssetAddress, setFromAssetAddress] = useState<string>("");
   const [toAssetAddress, setToAssetAddress] = useState<string>("");
   const [amountIn, setAmountIn] = useState<string | number>(1);
   const [error, setError] = useState<string | null>(null);
-  const [simulationResult, setSimulationResult] = useState<any>(null);
+  const [simulationResult, setSimulationResult] = useState<SwapSimulationResult | null>(null);
   const [isSwapping, setIsSwapping] = useState(false);
 
   const [tonConnectUI] = useTonConnectUI();
@@ -52,7 +41,7 @@ const SimpleSwapForm = () => {
     error: assetsError,
   } = useQuery({
     queryKey: ["assets"],
-    queryFn: fetchAssets,
+    queryFn: fetchLiquidAssets,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -78,6 +67,9 @@ const SimpleSwapForm = () => {
   const isAmountValid = Number.isFinite(numericAmount) && numericAmount > 0;
   const isConnected = Boolean(userAddress);
 
+  const formatUnits = (units: string, decimals: number) =>
+    Number(units) / 10 ** decimals;
+
   // Get asset display name
   const getAssetLabel = (asset: (typeof assets)[0]) => {
     return asset.meta?.symbol || asset.meta?.displayName || "Token";
@@ -95,23 +87,21 @@ const SimpleSwapForm = () => {
         setError(null);
         addLog("info", `Auto-simulating: ${numericAmount} ${getAssetLabel(fromAsset)} → ${getAssetLabel(toAsset)}`);
 
-        const client = new StonApiClient();
-        const fromDecimals = 10 ** (fromAsset.meta?.decimals ?? 9);
-        const offerUnits = (numericAmount * fromDecimals).toString();
-
-        const result = await client.simulateSwap({
-          offerAddress: fromAsset.contractAddress,
-          askAddress: toAsset.contractAddress,
+        const result = await simulateSwap({
+          offer: fromAsset,
+          ask: toAsset,
+          amount: numericAmount,
           slippageTolerance: "0.01",
-          offerUnits,
           referralAddress: REFERRAL_CONFIG.referrerAddress,
           referralFeeBps: REFERRAL_CONFIG.referrerFeeBps,
         });
 
         setSimulationResult(result);
 
-        const toDecimals = 10 ** (toAsset.meta?.decimals ?? 9);
-        const expectedOut = (Number(result.askUnits) / toDecimals).toFixed(4);
+        const expectedOut = formatUnits(
+          result.askUnits,
+          toAsset.meta?.decimals ?? 9,
+        ).toFixed(4);
         addLog("success", `Expected: ${expectedOut} ${getAssetLabel(toAsset)}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Auto-simulation failed";
@@ -150,15 +140,11 @@ const SimpleSwapForm = () => {
       // 1. Simulate swap first
       addLog("info", `Simulating swap: ${numericAmount} ${getAssetLabel(fromAsset)} → ${getAssetLabel(toAsset)}`);
 
-      const client = new StonApiClient();
-      const fromDecimals = 10 ** (fromAsset.meta?.decimals ?? 9);
-      const offerUnits = (numericAmount * fromDecimals).toString();
-
-      const result = await client.simulateSwap({
-        offerAddress: fromAsset.contractAddress,
-        askAddress: toAsset.contractAddress,
+      const result = await simulateSwap({
+        offer: fromAsset,
+        ask: toAsset,
+        amount: numericAmount,
         slippageTolerance: "0.01",
-        offerUnits,
         // Referral parameters for earning fees
         referralAddress: REFERRAL_CONFIG.referrerAddress,
         referralFeeBps: REFERRAL_CONFIG.referrerFeeBps,
@@ -166,70 +152,24 @@ const SimpleSwapForm = () => {
 
       setSimulationResult(result);
 
-      const toDecimals = 10 ** (toAsset.meta?.decimals ?? 9);
-      const expectedOut = (Number(result.askUnits) / toDecimals).toFixed(4);
+      const toDecimals = toAsset.meta?.decimals ?? 9;
+      const expectedOut = formatUnits(result.askUnits, toDecimals).toFixed(4);
       addLog("success", `Simulation: ${numericAmount} ${getAssetLabel(fromAsset)} → ${expectedOut} ${getAssetLabel(toAsset)}`);
 
-      // 2. Initialize TON JSON-RPC client
-      const tonApiClient = new Client({
-        endpoint: "https://toncenter.com/api/v2/jsonRPC",
-      });
-
-      // 3. Use the embedded router info from the simulation result
-      const routerInfo = result.router;
-      const dexContracts = dexFactory(routerInfo);
-      const router = tonApiClient.open(
-        dexContracts.Router.create(routerInfo.address)
+      // 2. Build tx params via shared swap helper
+      const swapParams = await buildSwapTx(
+        result,
+        userAddress,
+        fromAsset.kind,
+        toAsset.kind,
       );
-      const proxyTon = dexContracts.pTON.create(routerInfo.ptonMasterAddress);
-
-      // 4. Prepare common transaction parameters
-      const sharedTxParams = {
-        userWalletAddress: userAddress,
-        offerAmount: result.offerUnits,
-        minAskAmount: result.minAskUnits,
-      };
-
-      // 5. Determine swap type and get transaction parameters
-      const getSwapParams = () => {
-        // TON -> Jetton
-        if (fromAsset.kind === 'Ton') {
-          return router.getSwapTonToJettonTxParams({
-            ...sharedTxParams,
-            proxyTon,
-            askJettonAddress: result.askAddress,
-          });
-        }
-        // Jetton -> TON
-        if (toAsset.kind === 'Ton') {
-          return router.getSwapJettonToTonTxParams({
-            ...sharedTxParams,
-            proxyTon,
-            offerJettonAddress: result.offerAddress,
-          });
-        }
-        // Jetton -> Jetton
-        return router.getSwapJettonToJettonTxParams({
-          ...sharedTxParams,
-          offerJettonAddress: result.offerAddress,
-          askJettonAddress: result.askAddress,
-        });
-      };
-
-      const swapParams = await getSwapParams();
 
       addLog("info", "Sending transaction...");
 
-      // 6. Send transaction via TonConnect
+      // 3. Send transaction via TonConnect
       const txResult = await tonConnectUI.sendTransaction({
         validUntil: Date.now() + 5 * 60 * 1000,
-        messages: [
-          {
-            address: swapParams.to.toString(),
-            amount: swapParams.value.toString(),
-            payload: swapParams.body?.toBoc().toString("base64"),
-          }
-        ]
+        messages: [toTonConnectMessage(swapParams)],
       });
 
       // Calculate transaction hash from BOC

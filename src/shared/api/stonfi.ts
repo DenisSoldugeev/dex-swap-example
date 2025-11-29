@@ -1,7 +1,4 @@
-import { StonApiClient } from '@ston-fi/api';
-
-// StonApiClient wraps STON.fi HTTP API. Create a single instance to reuse connections.
-const stonClient = new StonApiClient();
+import {stonApiClient as stonClient} from '../stonfi/clients';
 
 export type StonAsset = Awaited<ReturnType<typeof stonClient.getAssets>>[number];
 

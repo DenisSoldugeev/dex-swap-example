@@ -1,8 +1,9 @@
 import {decrypt, encrypt, getEncryptionPassword} from '@/shared/utils/crypto';
 import {Address, Cell, SendMode} from '@ton/core';
 import {mnemonicToPrivateKey} from '@ton/crypto';
-import {internal, TonClient4, WalletContractV5R1} from '@ton/ton';
+import {internal, WalletContractV5R1} from '@ton/ton';
 import {createContext, ReactNode, useCallback, useContext, useEffect, useState} from 'react';
+import {tonLiteClient} from '../ton/clients';
 
 interface WalletContextType {
   wallet: WalletContractV5R1 | null;
@@ -44,11 +45,6 @@ const retryWithBackoff = async <T,>(
   }
   throw new Error('Max retries reached');
 };
-
-// Use TonClient4 with public endpoint (more reliable)
-const client = new TonClient4({
-  endpoint: 'https://mainnet-v4.tonhubapi.com',
-});
 
 export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [wallet, setWallet] = useState<WalletContractV5R1 | null>(null);
@@ -142,7 +138,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         const keyPair = await mnemonicToPrivateKey(mnemonic);
 
         // Use TonClient4 provider for wallet operations
-        const contract = client.open(wallet);
+        const contract = tonLiteClient.open(wallet);
 
         // Get seqno
         const seqno = await contract.getSeqno();

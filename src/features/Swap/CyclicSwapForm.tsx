@@ -1,5 +1,8 @@
 import {useConsoleLogger} from "@/features/Console/useConsoleLogger";
 import {REFERRAL_CONFIG} from "@/shared/config/referral";
+import {fetchLiquidAssets} from "@/shared/stonfi/assets";
+import {buildSwapTx, simulateSwap} from "@/shared/stonfi/swap";
+import {tonLiteClient} from "@/shared/ton/clients";
 import {decrypt, getEncryptionPassword} from "@/shared/utils/crypto";
 import {useWallet} from "@/shared/wallet/WalletContext";
 import {
@@ -16,29 +19,11 @@ import {
     Stack,
     Text,
 } from "@mantine/core";
-import {AssetTag, StonApiClient} from "@ston-fi/api";
-import {Client, dexFactory} from "@ston-fi/sdk";
 import {useQuery} from "@tanstack/react-query";
 import {SendMode} from "@ton/core";
 import {mnemonicToPrivateKey} from "@ton/crypto";
-import {internal, TonClient4, WalletContractV5R1} from "@ton/ton";
+import {internal, WalletContractV5R1} from "@ton/ton";
 import {useCallback, useMemo, useState} from "react";
-
-// TonClient4 for getting seqno
-const tonClient = new TonClient4({
-  endpoint: "https://mainnet-v4.tonhubapi.com",
-});
-
-// Fetch assets with high/medium liquidity
-const fetchAssets = async () => {
-  const client = new StonApiClient();
-  const condition = [
-    AssetTag.LiquidityVeryHigh,
-    AssetTag.LiquidityHigh,
-    AssetTag.LiquidityMedium,
-  ].join(" | ");
-  return client.queryAssets({ condition });
-};
 
 const CyclicSwapForm = () => {
   const [tokenAddress, setTokenAddress] = useState<string>("");
@@ -61,7 +46,7 @@ const CyclicSwapForm = () => {
     error: assetsError,
   } = useQuery({
     queryKey: ["assets"],
-    queryFn: fetchAssets,
+    queryFn: fetchLiquidAssets,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -84,6 +69,9 @@ const CyclicSwapForm = () => {
   const isDelayValid = Number.isFinite(numericDelay) && numericDelay >= 0;
   const isConnected = Boolean(userAddress);
 
+  const formatUnits = (units: string, decimals: number) =>
+    Number(units) / 10 ** decimals;
+
   const getAssetLabel = (asset: (typeof assets)[0]) => {
     return asset.meta?.symbol || asset.meta?.displayName || "Token";
   };
@@ -99,71 +87,31 @@ const CyclicSwapForm = () => {
         throw new Error("Missing required parameters");
       }
 
-      const stonClient = new StonApiClient();
-      const fromDecimals = 10 ** (fromAsset.meta?.decimals ?? 9);
-      const offerUnits = (amount * fromDecimals).toString();
-
       // 1. Simulate swap
-      const result = await stonClient.simulateSwap({
-        offerAddress: fromAsset.contractAddress,
-        askAddress: toAsset.contractAddress,
+      const result = await simulateSwap({
+        offer: fromAsset,
+        ask: toAsset,
+        amount,
         slippageTolerance: "0.01",
-        offerUnits,
         referralAddress: REFERRAL_CONFIG.referrerAddress,
         referralFeeBps: REFERRAL_CONFIG.referrerFeeBps,
       });
 
-      const toDecimals = 10 ** (toAsset.meta?.decimals ?? 9);
-      const expectedOut = Number(result.askUnits) / toDecimals;
+      const toDecimals = toAsset.meta?.decimals ?? 9;
+      const expectedOut = formatUnits(result.askUnits, toDecimals);
 
       addLog(
         "info",
         `Swap: ${amount.toFixed(2)} ${getAssetLabel(fromAsset)} → ${expectedOut.toFixed(4)} ${getAssetLabel(toAsset)}`,
       );
 
-      // 2. Initialize TON client
-      const tonApiClient = new Client({
-        endpoint: "https://toncenter.com/api/v2/jsonRPC",
-      });
-
-      // 3. Use router from simulation
-      const routerInfo = result.router;
-      const dexContracts = dexFactory(routerInfo);
-      const router = tonApiClient.open(
-        dexContracts.Router.create(routerInfo.address),
+      // 2. Get tx params via shared builder
+      const swapParams = await buildSwapTx(
+        result,
+        userAddress,
+        fromAsset.kind,
+        toAsset.kind,
       );
-      const proxyTon = dexContracts.pTON.create(routerInfo.ptonMasterAddress);
-
-      const sharedTxParams = {
-        userWalletAddress: userAddress,
-        offerAmount: result.offerUnits,
-        minAskAmount: result.minAskUnits,
-      };
-
-      // 4. Get swap params
-      const getSwapParams = () => {
-        if (fromAsset.kind === "Ton") {
-          return router.getSwapTonToJettonTxParams({
-            ...sharedTxParams,
-            proxyTon,
-            askJettonAddress: result.askAddress,
-          });
-        }
-        if (toAsset.kind === "Ton") {
-          return router.getSwapJettonToTonTxParams({
-            ...sharedTxParams,
-            proxyTon,
-            offerJettonAddress: result.offerAddress,
-          });
-        }
-        return router.getSwapJettonToJettonTxParams({
-          ...sharedTxParams,
-          offerJettonAddress: result.offerAddress,
-          askJettonAddress: result.askAddress,
-        });
-      };
-
-      const swapParams = await getSwapParams();
 
       // 5. АВТОМАТИЧЕСКАЯ ПОДПИСЬ И ОТПРАВКА
       addLog("info", "Auto-signing transaction...");
@@ -186,14 +134,14 @@ const CyclicSwapForm = () => {
       });
 
       // Открываем контракт с клиентом
-      const contract = tonClient.open(wallet);
+      const contract = tonLiteClient.open(wallet);
 
       // Получаем seqno
       let seqno = await contract.getSeqno();
       addLog("info", `Current seqno: ${seqno}`);
 
       // Парсим body
-      const body = swapParams.body ? swapParams.body : undefined;
+      const body = swapParams.raw.body ?? undefined;
 
       // Отправляем транзакцию напрямую через контракт
       addLog("info", `Sending transaction to blockchain...`);
@@ -203,8 +151,8 @@ const CyclicSwapForm = () => {
         secretKey: keyPair.secretKey,
         messages: [
           internal({
-            to: swapParams.to,
-            value: swapParams.value,
+            to: swapParams.raw.to,
+            value: swapParams.raw.value,
             body: body,
           }),
         ],

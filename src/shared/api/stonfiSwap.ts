@@ -1,11 +1,9 @@
+import {tonLiteClient} from "@/shared/ton/clients";
 import {DEX} from "@ston-fi/sdk";
-import {Address, beginCell, TonClient4} from "@ton/ton";
-
-// Mainnet HTTP endpoint; replace with your reliable provider if needed.
-const client = new TonClient4({ endpoint: "https://mainnet-v4.tonhubapi.com" });
+import {Address, beginCell} from "@ton/ton";
 
 const router = new DEX.v1.Router();
-const routerProvider = client.provider(router.address);
+const routerProvider = tonLiteClient.provider(router.address);
 
 export type SwapConfig = {
   offerMinter: string;
@@ -28,7 +26,7 @@ const applySlippage = (value: bigint, bps: number) =>
   (value * BigInt(10_000 - bps)) / BigInt(10_000);
 
 const getJettonWalletAddress = async (jettonMinter: string, owner: Address) => {
-  const provider = client.provider(Address.parse(jettonMinter));
+  const provider = tonLiteClient.provider(Address.parse(jettonMinter));
   const result = await provider.get("get_wallet_address", [
     { type: "slice", cell: beginCell().storeAddress(owner).endCell() },
   ]);
@@ -51,7 +49,7 @@ export const getSwapQuote = async (
     token0: offerMinter,
     token1: askMinter,
   });
-  const poolProvider = client.provider(pool.address);
+  const poolProvider = tonLiteClient.provider(pool.address);
 
   // Jetton wallet owned by router for the token we are selling
   const offerRouterWallet = await getJettonWalletAddress(
